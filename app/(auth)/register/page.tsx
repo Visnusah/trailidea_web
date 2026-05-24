@@ -553,12 +553,12 @@ export default function RegisterPage() {
         aria-hidden="true"
         role="presentation"
       >
-        <div className="hero panel">
+        <div className="hero-panel">
           <Image
-            src="/images/trailhero.jpg"
+            src="/images/trail-hero.jpg"
             alt=""
             fill
-            className="hero panel"
+            className="hero-panel__img"
             style={{ objectFit: "cover" }}
             priority
             sizes="50vw"
@@ -591,16 +591,17 @@ export default function RegisterPage() {
               <div className="testimonial-card__author">
                 <Image
                   src="/images/person.png"
-                  alt="Kamlesh sah, CEO of Trailidea"
+                  alt="kamlesh sah, CEO of trailidea"
                   width={52}
                   height={52}
                   className="testimonial-card__avatar"
                   style={{ borderRadius: "50%", objectFit: "cover" }}
+                  unoptimized
                 />
                 <div>
-                  <p className="testimonial-card__name">Julian Thorne</p>
+                  <p className="testimonial-card__name">Kamlesh sah</p>
                   <p className="testimonial-card__role">
-                    National Geographic Explorer
+                    CEO of Trailidea
                   </p>
                 </div>
               </div>
