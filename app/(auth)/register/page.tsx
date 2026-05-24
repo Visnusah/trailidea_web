@@ -61,12 +61,12 @@ export default function RegisterPage() {
   // Update text/email fields and clear their error
   const handleChange =
     (field: keyof Omit<RegisterFormData, "terms">) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-      if (fieldErrors[field]) {
-        setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
-      }
-    };
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+        if (fieldErrors[field]) {
+          setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+        }
+      };
 
   // Update checkbox
   const handleTermsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,9 +342,8 @@ export default function RegisterPage() {
                     {[1, 2, 3, 4].map((bar) => (
                       <div
                         key={bar}
-                        className={`password-strength__bar ${
-                          bar <= strength.level ? strength.barClass : ""
-                        }`}
+                        className={`password-strength__bar ${bar <= strength.level ? strength.barClass : ""
+                          }`}
                       />
                     ))}
                   </div>
@@ -534,13 +533,13 @@ export default function RegisterPage() {
               © 2024 Trailidea. Explore responsibly.
             </p>
             <nav className="auth-footer__links" aria-label="Footer links">
-              <Link href="#" className="auth-footer__link">
+              <Link href="#" className="">
                 Privacy
               </Link>
-              <Link href="#" className="auth-footer__link">
+              <Link href="#" className="">
                 Terms
               </Link>
-              <Link href="#" className="auth-footer__link">
+              <Link href="#" className="">
                 Safety
               </Link>
             </nav>
@@ -554,12 +553,12 @@ export default function RegisterPage() {
         aria-hidden="true"
         role="presentation"
       >
-        <div className="hero-panel">
+        <div className="hero panel">
           <Image
-            src="/images/trail-hero.png"
+            src="/images/trailhero.jpg"
             alt=""
             fill
-            className="hero-panel__img"
+            className="hero panel"
             style={{ objectFit: "cover" }}
             priority
             sizes="50vw"
@@ -591,17 +590,17 @@ export default function RegisterPage() {
               </blockquote>
               <div className="testimonial-card__author">
                 <Image
-                  src="/images/explorer-avatar.png"
-                  alt="Julian Thorne, National Geographic Explorer"
+                  src="/images/person.png"
+                  alt="Kamlesh sah, CEO of Trailidea"
                   width={52}
                   height={52}
                   className="testimonial-card__avatar"
                   style={{ borderRadius: "50%", objectFit: "cover" }}
                 />
                 <div>
-                  <p className="testimonial-card__name">Julian Thorne</p>
+                  <p className="testimonial-card__name">Kamlesh sah</p>
                   <p className="testimonial-card__role">
-                    National Geographic Explorer
+                    CEO of Trailidea
                   </p>
                 </div>
               </div>
