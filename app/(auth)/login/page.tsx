@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { z } from "zod";
+import { loginSchema, type LoginFormData } from "@/app/lib/validations/auth";
 import GoogleIcon from "@/app/components/ui/GoogleIcon";
 
-// ── Demo credentials 
+//Demo credentials
 const DEMO_EMAIL = "demo@trailidea.com";
 const DEMO_PASSWORD = "trail2026";
 
@@ -16,23 +18,70 @@ const DEMO_PASSWORD = "trail2026";
 export default function LoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: "",
+    password: "",
+  });
+  // Field-level Zod errors
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof LoginFormData, string>>
+  >({});
+  // Server / submit-level error
+  const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Update a single field and clear its error
+  const handleChange =
+    (field: keyof LoginFormData) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+      if (fieldErrors[field]) {
+        setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+      }
+      if (serverError) setServerError("");
+    };
+
+  // Validate a single field on blur for instant feedback
+  const handleBlur = (field: keyof LoginFormData) => () => {
+    const result = loginSchema.shape[field].safeParse(formData[field]);
+    if (!result.success) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [field]: result.error.issues[0].message,
+      }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
+    setServerError("");
+
+    // Full schema validation
+    const result = loginSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Partial<Record<keyof LoginFormData, string>> = {};
+      result.error.issues.forEach((err: z.ZodIssue) => {
+        const field = err.path[0] as keyof LoginFormData;
+        if (!errors[field]) errors[field] = err.message;
+      });
+      setFieldErrors(errors);
+      return;
+    }
+
     setLoading(true);
 
     // Simulate a brief network delay for realism
     await new Promise((res) => setTimeout(res, 600));
 
-    if (email === DEMO_EMAIL && password === DEMO_PASSWORD) {
+    if (
+      result.data.email === DEMO_EMAIL &&
+      result.data.password === DEMO_PASSWORD
+    ) {
       router.push("/dashboard");
     } else {
-      setError("Incorrect email or password. Use the demo credentials : demo@trailidea.com / trail2026.");
+      setServerError(
+        "Incorrect email or password. Use the demo credentials: demo@trailidea.com / trail2026."
+      );
       setLoading(false);
     }
   };
@@ -61,8 +110,8 @@ export default function LoginPage() {
               noValidate
               aria-label="Sign in form"
             >
-              {/* Error banner */}
-              {error && (
+              {/* Server error banner */}
+              {serverError && (
                 <div
                   role="alert"
                   style={{
@@ -84,7 +133,7 @@ export default function LoginPage() {
                   >
                     error
                   </span>
-                  {error}
+                  {serverError}
                 </div>
               )}
 
@@ -103,14 +152,35 @@ export default function LoginPage() {
                   <input
                     id="login-email"
                     type="email"
-                    className="form-input"
+                    className={`form-input${fieldErrors.email ? " form-input--error" : ""}`}
                     placeholder="explorer@trailidea.com"
                     autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={formData.email}
+                    onChange={handleChange("email")}
+                    onBlur={handleBlur("email")}
+                    aria-describedby={
+                      fieldErrors.email ? "login-email-error" : undefined
+                    }
+                    aria-invalid={!!fieldErrors.email}
                     required
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p
+                    id="login-email-error"
+                    className="form-field-error"
+                    role="alert"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ fontSize: "14px" }}
+                      aria-hidden="true"
+                    >
+                      error
+                    </span>
+                    {fieldErrors.email}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -128,11 +198,16 @@ export default function LoginPage() {
                   <input
                     id="login-password"
                     type={showPassword ? "text" : "password"}
-                    className="form-input form-input--with-action"
+                    className={`form-input form-input--with-action${fieldErrors.password ? " form-input--error" : ""}`}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={formData.password}
+                    onChange={handleChange("password")}
+                    onBlur={handleBlur("password")}
+                    aria-describedby={
+                      fieldErrors.password ? "login-password-error" : undefined
+                    }
+                    aria-invalid={!!fieldErrors.password}
                     required
                   />
                   <button
@@ -149,6 +224,22 @@ export default function LoginPage() {
                     </span>
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p
+                    id="login-password-error"
+                    className="form-field-error"
+                    role="alert"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ fontSize: "14px" }}
+                      aria-hidden="true"
+                    >
+                      error
+                    </span>
+                    {fieldErrors.password}
+                  </p>
+                )}
               </div>
 
               {/* Helpers */}
