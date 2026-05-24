@@ -598,9 +598,9 @@ export default function RegisterPage() {
                   style={{ borderRadius: "50%", objectFit: "cover" }}
                 />
                 <div>
-                  <p className="testimonial-card__name">Kamlesh sah</p>
+                  <p className="testimonial-card__name">Julian Thorne</p>
                   <p className="testimonial-card__role">
-                    CEO of Trailidea
+                    National Geographic Explorer
                   </p>
                 </div>
               </div>
