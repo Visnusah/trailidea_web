@@ -14,15 +14,21 @@ export const loginSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-// ── Register Schema 
+// ── Register Schema (aligned with backend CreateUserDTO)
 export const registerSchema = z
   .object({
-    fullName: z
+    firstName: z
       .string()
-      .min(1, "Full name is required")
-      .min(2, "Full name must be at least 2 characters")
-      .max(80, "Full name must be under 80 characters")
-      .regex(/^[a-zA-Z\s'-]+$/, "Full name can only contain letters, spaces, hyphens, and apostrophes"),
+      .min(1, "First name is required")
+      .min(2, "First name must be at least 2 characters")
+      .max(40, "First name must be under 40 characters")
+      .regex(/^[a-zA-Z\s'-]+$/, "First name can only contain letters, spaces, hyphens, and apostrophes"),
+    lastName: z
+      .string()
+      .min(1, "Last name is required")
+      .min(2, "Last name must be at least 2 characters")
+      .max(40, "Last name must be under 40 characters")
+      .regex(/^[a-zA-Z\s'-]+$/, "Last name can only contain letters, spaces, hyphens, and apostrophes"),
     username: z
       .string()
       .min(1, "Username is required")
@@ -44,9 +50,6 @@ export const registerSchema = z
       .regex(/[a-z]/, "Password must include at least one lowercase letter")
       .regex(/[0-9]/, "Password must include at least one number"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
-    terms: z.boolean().refine((val) => val === true, {
-      message: "You must agree to the Terms of Service and Privacy Policy",
-    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ["confirmPassword"],

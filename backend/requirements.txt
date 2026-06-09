@@ -1,0 +1,28 @@
+# Trail Backend - Dependencies
+# Node.js Version: 18+ (recommended)
+# Package Manager: npm or yarn
+
+# Production Dependencies
+@types/express@^5.0.6
+@types/jsonwebtoken@^9.0.10
+bcryptjs@^3.0.3
+cors@^2.8.6
+dotenv@^17.4.2
+express@^5.2.1
+jsonwebtoken@^9.0.3
+mongoose@^9.6.2
+morgan@^1.11.0
+tsx@^4.21.0
+zod@^4.4.2
+
+# Development Dependencies
+@types/cors@^2.8.19
+@types/node@^25.6.0
+ts-node@^10.9.2
+typescript@^6.0.3
+
+# Quick Start Commands:
+# 1. npm install (installs all dependencies from package.json)
+# 2. npm run dev (runs with hot-reload for development)
+# 3. npm start (single run)
+# 4. npm run start-day2 (runs specific script)
