@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import { z } from "zod";
 import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
-import TrailideaLogo from "@/frontend/app/_components/ui/TrailideaLogo";
-import GoogleIcon from "@/frontend/app/_components/ui/GoogleIcon";
+import TrailideaLogo from "@/app/_components/ui/TrailideaLogo";
+import GoogleIcon from "@/app/_components/ui/GoogleIcon";
 
 // Password strength 
 function getPasswordStrength(password: string): {

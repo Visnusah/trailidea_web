@@ -1,7 +1,7 @@
 // app/(auth)/_components/LoginForm.tsx
 "use client";
 import { useForm } from "react-hook-form";
-import { LoginFormData, loginSchema } from "@/frontend/app/(auth)/_components/schema";
+import { LoginFormData, loginSchema } from "@/app/(auth)/_components/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";

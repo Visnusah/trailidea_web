@@ -1,7 +1,7 @@
 // app/(auth)/_components/RegisterForm.tsx
 "use client";
 import { useForm } from "react-hook-form";
-import { registerSchema, RegisterFormData } from "@/frontend/app/(auth)/_components/schema";
+import { registerSchema, RegisterFormData } from "@/app/(auth)/_components/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";

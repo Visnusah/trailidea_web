@@ -1,6 +1,6 @@
 "use server"; // server side api call
 import { register, login } from "@/lib/api/auth";
-import { LoginFormData, RegisterFormData } from "@/frontend/app/(auth)/_components/schema";
+import { LoginFormData, RegisterFormData } from "@/app/(auth)/_components/schema";
 import { setTokenCookie, storeUserData } from "@/lib/cookies";
 
 export const handleRegisterUser = async (data: RegisterFormData) => {

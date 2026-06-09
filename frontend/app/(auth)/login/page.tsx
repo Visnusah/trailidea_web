@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
-import GoogleIcon from "@/frontend/app/_components/ui/GoogleIcon";
+import GoogleIcon from "@/app/_components/ui/GoogleIcon";
 
 //Demo credentials
 const DEMO_EMAIL = "demo@trailidea.com";
