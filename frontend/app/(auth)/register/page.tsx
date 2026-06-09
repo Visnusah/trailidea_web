@@ -3,12 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
 import TrailideaLogo from "@/app/_components/ui/TrailideaLogo";
 import GoogleIcon from "@/app/_components/ui/GoogleIcon";
 
-// Password strength 
+// Password strength indicator helper
 function getPasswordStrength(password: string): {
   level: number; // 0–4
   label: string;
@@ -37,16 +38,23 @@ function getPasswordStrength(password: string): {
   };
 }
 
+interface FormState extends RegisterFormData {
+  terms: boolean;
+}
+
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState("");
 
-  const [formData, setFormData] = useState<RegisterFormData>({
-    fullName: "",
+  const [formData, setFormData] = useState<FormState>({
+    firstName: "",
+    lastName: "",
     username: "",
     email: "",
     password: "",
@@ -58,27 +66,26 @@ export default function RegisterPage() {
 
   const strength = getPasswordStrength(formData.password);
 
-  // Update text/email fields and clear their error
+  // Update text/email/password fields and clear their error
   const handleChange =
-    (field: keyof Omit<RegisterFormData, "terms">) =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-        if (fieldErrors[field]) {
-          setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
-        }
-      };
+    (field: keyof RegisterFormData) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+      if (fieldErrors[field]) {
+        setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+      }
+      if (serverError) setServerError("");
+    };
 
   // Update checkbox
   const handleTermsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, terms: e.target.checked }));
-    if (fieldErrors.terms) {
-      setFieldErrors((prev) => ({ ...prev, terms: undefined }));
-    }
+    if (serverError) setServerError("");
   };
 
   // Validate individual field on blur
   const handleBlur =
-    (field: keyof Omit<RegisterFormData, "terms">) => () => {
+    (field: keyof RegisterFormData) => () => {
       // For cross-field rules (confirmPassword) we need the full object
       if (field === "confirmPassword") {
         const result = registerSchema.safeParse(formData);
@@ -96,9 +103,10 @@ export default function RegisterPage() {
         return;
       }
 
-      // For standalone fields use the shape directly
-      const fieldSchema =
-        registerSchema._def.shape[field as keyof Omit<RegisterFormData, "terms">];
+      // For standalone fields use the shape directly (supporting refined schemas)
+      const shape = (registerSchema._def as any).shape || (registerSchema._def as any).schema?._def?.shape;
+      if (!shape) return;
+      const fieldSchema = shape[field];
       if (!fieldSchema) return;
       const result = fieldSchema.safeParse(formData[field]);
       if (!result.success) {
@@ -111,6 +119,12 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setServerError("");
+
+    if (!formData.terms) {
+      setServerError("You must agree to the Terms of Service and Privacy Policy");
+      return;
+    }
 
     // Full schema validation
     const result = registerSchema.safeParse(formData);
@@ -125,10 +139,42 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-    // Simulate network delay — wire up real API here
-    await new Promise((res) => setTimeout(res, 800));
-    setLoading(false);
-    setSubmitted(true);
+
+    try {
+      const response = await fetch("http://localhost:8089/api/v1/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: result.data.firstName,
+          lastName: result.data.lastName,
+          username: result.data.username,
+          email: result.data.email,
+          password: result.data.password,
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setServerError(data.message || "Registration failed");
+        setLoading(false);
+        return;
+      }
+
+      // Store credentials
+      localStorage.setItem("authToken", data.data.token);
+      localStorage.setItem("user", JSON.stringify(data.data.user));
+
+      setSubmitted(true);
+      // Brief timeout before redirecting to dashboard
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
+    } catch (error: any) {
+      setServerError(error.message || "An error occurred. Please try again.");
+      setLoading(false);
+    }
   };
 
   if (submitted) {
@@ -149,11 +195,11 @@ export default function RegisterPage() {
             Account Created!
           </h2>
           <p style={{ color: "var(--color-on-surface-variant)", marginBottom: "24px" }}>
-            Welcome to Trailidea, {formData.fullName.split(" ")[0]}. Your adventure starts now.
+            Welcome to Trailidea, {formData.firstName}. Your adventure starts now.
           </p>
-          <Link href="/login" className="btn btn--primary" style={{ display: "inline-flex" }}>
-            Go to Sign In
-          </Link>
+          <div style={{ color: "var(--color-outline)", fontSize: "14px" }}>
+            Redirecting to dashboard...
+          </div>
         </div>
       </div>
     );
@@ -180,114 +226,177 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/*   Registration Form   */}
+          {/* Registration Form */}
           <form
             className="form animate-fade-in-up animate-delay-100"
             onSubmit={handleSubmit}
             noValidate
             aria-label="Create account form"
           >
-            {/* Full Name */}
+            {/* Server error banner */}
+            {serverError && (
+              <div
+                role="alert"
+                style={{
+                  background: "var(--color-error-container)",
+                  color: "var(--color-on-error-container)",
+                  borderRadius: "var(--radius-default)",
+                  padding: "10px 14px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: "18px", flexShrink: 0 }}
+                  aria-hidden="true"
+                >
+                  error
+                </span>
+                {serverError}
+              </div>
+            )}
+
+            {/* First Name & Last Name Grid */}
+            <div className="form-group-grid form-group-grid--2col">
+              {/* First Name */}
+              <div className="form-group">
+                <label className="form-label" htmlFor="reg-firstname">
+                  First Name
+                </label>
+                <div className="form-input-wrapper">
+                  <span
+                    className="material-symbols-outlined form-input-icon"
+                    aria-hidden="true"
+                  >
+                    person
+                  </span>
+                  <input
+                    id="reg-firstname"
+                    type="text"
+                    className={`form-input${fieldErrors.firstName ? " form-input--error" : ""}`}
+                    placeholder="Alex"
+                    autoComplete="given-name"
+                    value={formData.firstName}
+                    onChange={handleChange("firstName")}
+                    onBlur={handleBlur("firstName")}
+                    aria-describedby={fieldErrors.firstName ? "reg-firstname-error" : undefined}
+                    aria-invalid={!!fieldErrors.firstName}
+                    required
+                  />
+                </div>
+                {fieldErrors.firstName && (
+                  <p id="reg-firstname-error" className="form-field-error" role="alert">
+                    <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
+                    {fieldErrors.firstName}
+                  </p>
+                )}
+              </div>
+
+              {/* Last Name */}
+              <div className="form-group">
+                <label className="form-label" htmlFor="reg-lastname">
+                  Last Name
+                </label>
+                <div className="form-input-wrapper">
+                  <span
+                    className="material-symbols-outlined form-input-icon"
+                    aria-hidden="true"
+                  >
+                    person
+                  </span>
+                  <input
+                    id="reg-lastname"
+                    type="text"
+                    className={`form-input${fieldErrors.lastName ? " form-input--error" : ""}`}
+                    placeholder="Rivers"
+                    autoComplete="family-name"
+                    value={formData.lastName}
+                    onChange={handleChange("lastName")}
+                    onBlur={handleBlur("lastName")}
+                    aria-describedby={fieldErrors.lastName ? "reg-lastname-error" : undefined}
+                    aria-invalid={!!fieldErrors.lastName}
+                    required
+                  />
+                </div>
+                {fieldErrors.lastName && (
+                  <p id="reg-lastname-error" className="form-field-error" role="alert">
+                    <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
+                    {fieldErrors.lastName}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Username */}
             <div className="form-group">
-              <label className="form-label" htmlFor="reg-fullname">
-                Full Name
+              <label className="form-label" htmlFor="reg-username">
+                Username
               </label>
               <div className="form-input-wrapper">
                 <span
                   className="material-symbols-outlined form-input-icon"
                   aria-hidden="true"
                 >
-                  person
+                  alternate_email
                 </span>
                 <input
-                  id="reg-fullname"
+                  id="reg-username"
                   type="text"
-                  className={`form-input${fieldErrors.fullName ? " form-input--error" : ""}`}
-                  placeholder="Alex Rivers"
-                  autoComplete="name"
-                  value={formData.fullName}
-                  onChange={handleChange("fullName")}
-                  onBlur={handleBlur("fullName")}
-                  aria-describedby={fieldErrors.fullName ? "reg-fullname-error" : undefined}
-                  aria-invalid={!!fieldErrors.fullName}
+                  className={`form-input${fieldErrors.username ? " form-input--error" : ""}`}
+                  placeholder="trailblazer_99"
+                  autoComplete="username"
+                  value={formData.username}
+                  onChange={handleChange("username")}
+                  onBlur={handleBlur("username")}
+                  aria-describedby={fieldErrors.username ? "reg-username-error" : undefined}
+                  aria-invalid={!!fieldErrors.username}
                   required
                 />
               </div>
-              {fieldErrors.fullName && (
-                <p id="reg-fullname-error" className="form-field-error" role="alert">
+              {fieldErrors.username && (
+                <p id="reg-username-error" className="form-field-error" role="alert">
                   <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
-                  {fieldErrors.fullName}
+                  {fieldErrors.username}
                 </p>
               )}
             </div>
 
-            {/* Username + Email grid */}
-            <div className="form-group-grid form-group-grid--2col">
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-username">
-                  Username
-                </label>
-                <div className="form-input-wrapper">
-                  <span
-                    className="material-symbols-outlined form-input-icon"
-                    aria-hidden="true"
-                  >
-                    alternate_email
-                  </span>
-                  <input
-                    id="reg-username"
-                    type="text"
-                    className={`form-input${fieldErrors.username ? " form-input--error" : ""}`}
-                    placeholder="trailblazer_99"
-                    autoComplete="username"
-                    value={formData.username}
-                    onChange={handleChange("username")}
-                    onBlur={handleBlur("username")}
-                    aria-describedby={fieldErrors.username ? "reg-username-error" : undefined}
-                    aria-invalid={!!fieldErrors.username}
-                    required
-                  />
-                </div>
-                {fieldErrors.username && (
-                  <p id="reg-username-error" className="form-field-error" role="alert">
-                    <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
-                    {fieldErrors.username}
-                  </p>
-                )}
+            {/* Email Address */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="reg-email">
+                Email Address
+              </label>
+              <div className="form-input-wrapper">
+                <span
+                  className="material-symbols-outlined form-input-icon"
+                  aria-hidden="true"
+                >
+                  mail
+                </span>
+                <input
+                  id="reg-email"
+                  type="email"
+                  className={`form-input${fieldErrors.email ? " form-input--error" : ""}`}
+                  placeholder="alex@trailidea.com"
+                  autoComplete="email"
+                  value={formData.email}
+                  onChange={handleChange("email")}
+                  onBlur={handleBlur("email")}
+                  aria-describedby={fieldErrors.email ? "reg-email-error" : undefined}
+                  aria-invalid={!!fieldErrors.email}
+                  required
+                />
               </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-email">
-                  Email Address
-                </label>
-                <div className="form-input-wrapper">
-                  <span
-                    className="material-symbols-outlined form-input-icon"
-                    aria-hidden="true"
-                  >
-                    mail
-                  </span>
-                  <input
-                    id="reg-email"
-                    type="email"
-                    className={`form-input${fieldErrors.email ? " form-input--error" : ""}`}
-                    placeholder="alex@trailidea.com"
-                    autoComplete="email"
-                    value={formData.email}
-                    onChange={handleChange("email")}
-                    onBlur={handleBlur("email")}
-                    aria-describedby={fieldErrors.email ? "reg-email-error" : undefined}
-                    aria-invalid={!!fieldErrors.email}
-                    required
-                  />
-                </div>
-                {fieldErrors.email && (
-                  <p id="reg-email-error" className="form-field-error" role="alert">
-                    <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
-                    {fieldErrors.email}
-                  </p>
-                )}
-              </div>
+              {fieldErrors.email && (
+                <p id="reg-email-error" className="form-field-error" role="alert">
+                  <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -342,8 +451,7 @@ export default function RegisterPage() {
                     {[1, 2, 3, 4].map((bar) => (
                       <div
                         key={bar}
-                        className={`password-strength__bar ${bar <= strength.level ? strength.barClass : ""
-                          }`}
+                        className={`password-strength__bar ${bar <= strength.level ? strength.barClass : ""}`}
                       />
                     ))}
                   </div>
@@ -427,7 +535,7 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Terms */}
+            {/* Terms checkbox */}
             <div className="terms-group">
               <input
                 id="reg-terms"
@@ -435,8 +543,6 @@ export default function RegisterPage() {
                 className="terms-group__checkbox"
                 checked={formData.terms}
                 onChange={handleTermsChange}
-                aria-describedby={fieldErrors.terms ? "reg-terms-error" : undefined}
-                aria-invalid={!!fieldErrors.terms}
                 required
               />
               <label className="terms-group__label" htmlFor="reg-terms">
@@ -445,14 +551,8 @@ export default function RegisterPage() {
                 <Link href="#">Privacy Policy</Link>.
               </label>
             </div>
-            {fieldErrors.terms && (
-              <p id="reg-terms-error" className="form-field-error" role="alert">
-                <span className="material-symbols-outlined" style={{ fontSize: "14px" }} aria-hidden="true">error</span>
-                {fieldErrors.terms}
-              </p>
-            )}
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               className="btn btn--primary"
@@ -489,7 +589,7 @@ export default function RegisterPage() {
               <span className="divider__text">or sign up with</span>
             </div>
 
-            {/* Social */}
+            {/* Social options */}
             <div className="social-row">
               <button
                 type="button"
@@ -504,7 +604,6 @@ export default function RegisterPage() {
                 className="btn btn--social"
                 aria-label="Sign up with Facebook"
               >
-                {/* Facebook icon */}
                 <svg
                   width="18"
                   height="18"
@@ -533,21 +632,15 @@ export default function RegisterPage() {
               © 2024 Trailidea. Explore responsibly.
             </p>
             <nav className="auth-footer__links" aria-label="Footer links">
-              <Link href="#" className="">
-                Privacy
-              </Link>
-              <Link href="#" className="">
-                Terms
-              </Link>
-              <Link href="#" className="">
-                Safety
-              </Link>
+              <Link href="#">Privacy</Link>
+              <Link href="#">Terms</Link>
+              <Link href="#">Safety</Link>
             </nav>
           </div>
         </div>
       </div>
 
-      {/*   Right: Hero panel (desktop only)   */}
+      {/* Right: Hero panel (desktop only) */}
       <div
         className="auth-register-hero-col"
         aria-hidden="true"

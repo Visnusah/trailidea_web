@@ -70,18 +70,31 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    // Simulate a brief network delay for realism
-    await new Promise((res) => setTimeout(res, 600));
+    try {
+      // Call actual API
+      const response = await fetch("http://localhost:8089/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result.data),
+        credentials: "include"
+      });
 
-    if (
-      result.data.email === DEMO_EMAIL &&
-      result.data.password === DEMO_PASSWORD
-    ) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        setServerError(data.message || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      // Store token in localStorage
+      localStorage.setItem("authToken", data.data.token);
+      localStorage.setItem("user", JSON.stringify(data.data.user));
+
+      // Redirect to dashboard
       router.push("/dashboard");
-    } else {
-      setServerError(
-        "Incorrect email or password. Use the demo credentials: demo@trailidea.com / trail2026."
-      );
+    } catch (error: any) {
+      setServerError(error.message || "An error occurred. Please try again.");
       setLoading(false);
     }
   };
