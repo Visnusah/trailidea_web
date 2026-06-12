@@ -2,7 +2,7 @@
 
 ## Base URL
 ```
-http://localhost:5000/api/v1/auth
+http://localhost:8089/api/v1/auth
 ```
 
 ---
@@ -11,7 +11,7 @@ http://localhost:5000/api/v1/auth
 
 ### Request Details:
 - **Method**: POST
-- **URL**: `http://localhost:5000/api/v1/auth/register`
+- **URL**: `http://localhost:8088/api/v1/auth/register`
 - **Content-Type**: `application/json`
 
 ### Request Body (JSON):
@@ -70,7 +70,7 @@ http://localhost:5000/api/v1/auth
 
 ### Request Details:
 - **Method**: POST
-- **URL**: `http://localhost:5000/api/v1/auth/login`
+- **URL**: `http://localhost:8089/api/v1/auth/login`
 - **Content-Type**: `application/json`
 
 ### Request Body (JSON):
@@ -171,7 +171,7 @@ Authorization: Bearer <your_jwt_token>
 1. Open Postman
 2. Create new request
 3. Set method to **POST**
-4. Enter URL: `http://localhost:5000/api/v1/auth/register`
+4. Enter URL: `http://localhost:8089/api/v1/auth/register`
 5. Go to **Body** tab
 6. Select **raw** → **JSON**
 7. Paste the register body above
@@ -180,7 +180,7 @@ Authorization: Bearer <your_jwt_token>
 ### Step 2: Login with Created User
 1. Create new request
 2. Set method to **POST**
-3. Enter URL: `http://localhost:5000/api/v1/auth/login`
+3. Enter URL: `http://localhost:8089/api/v1/auth/login`
 4. Go to **Body** tab
 5. Select **raw** → **JSON**
 6. Paste the login body
@@ -216,8 +216,8 @@ pm.environment.set("authToken", jsonData.data.token);
 ## 7. FRONTEND INTEGRATION
 
 The frontend sends data to:
-- **Register**: `http://localhost:5000/api/v1/auth/register`
-- **Login**: `http://localhost:5000/api/v1/auth/login`
+- **Register**: `http://localhost:8089/api/v1/auth/register`
+- **Login**: `http://localhost:8089/api/v1/auth/login`
 
 After successful response:
 1. Token stored in `localStorage.authToken`
@@ -232,7 +232,7 @@ After successful response:
 **Solution**: Backend already has CORS configured for `http://localhost:3000`
 
 ### Connection Refused
-**Solution**: Make sure backend is running on port 5000:
+**Solution**: Make sure backend is running on port 8089:
 ```bash
 cd backend
 npm run dev
