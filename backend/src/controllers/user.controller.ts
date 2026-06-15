@@ -11,7 +11,7 @@ export class UserController {
             const userData = CreateUserDTO.safeParse(req.body);
             if (!userData.success) {
                 return ApiResponseHelper
-                    .error(res, z.prettifyError(userData.error), 400);
+                    .error(res, userData.error.errors.map(e => e.message).join(", "), 400);
             }
             const user = await userService.createUser(userData.data);
             return ApiResponseHelper.success(res, user, "User created successfully");
@@ -29,7 +29,7 @@ export class UserController {
             const parsedData = LoginUserDTO.safeParse(req.body);
             if (!parsedData.success) {
                 return ApiResponseHelper
-                    .error(res, z.prettifyError(parsedData.error), 400);
+                    .error(res, parsedData.error.errors.map(e => e.message).join(", "), 400);
             }
             const { user, token } = await userService.loginUser(parsedData.data);
             return ApiResponseHelper.success(res, { user, token }, "Login successful");
