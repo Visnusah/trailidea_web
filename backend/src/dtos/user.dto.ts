@@ -13,14 +13,12 @@ export const CreateUserDTO = UserSchema.pick({
 export type CreateUserDTO = z.infer<typeof CreateUserDTO>;
 
 // Login Dto
-// 1. Create new schame
-// export const LoginUserDTO = z.object({
-//     email: z.email(),
-//     password: z.string().min(6, "Password must be at least 6 characters long")
-// });
-// 2. Reuse existing schema
 export const LoginUserDTO = UserSchema.pick({
     email: true,
     password: true
 });
 export type LoginUserDTO = z.infer<typeof LoginUserDTO>;
+
+
+export const UpdateUserDto = UserSchema.partial();
+export type UpdateUserDto = z.infer<typeof UpdateUserDto>;

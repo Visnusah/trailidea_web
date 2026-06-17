@@ -1,12 +1,9 @@
 import multer, { FileFilterCallback } from "multer";
-import uuid from "uuid";
 import path from "path";
 import { Request } from "express";
 import { HttpException } from "../exceptions/http-exception";
 import fs from "fs";
-import { v4 as uuidv4 } from "uuid";
-import { array } from "zod";
-import { useFieldArray } from "react-hook-form";
+import crypto from "crypto";
 const storage = multer.diskStorage(
     {
         destination:(
@@ -26,7 +23,7 @@ const storage = multer.diskStorage(
             file: any,
             cb: (error: Error | null, filename: string) => void
         ) => {
-            const fileSuffix = uuidv4(); // generate suffix
+            const fileSuffix = crypto.randomUUID(); // generate suffix
             cb(null, `${fileSuffix}-${file.originalname}`); // upload unique filename
         }
     }

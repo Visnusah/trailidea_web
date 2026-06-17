@@ -1,5 +1,5 @@
 import { UserMongoRepository } from "../repositories/user.repository";
-import { CreateUserDTO, LoginUserDTO } from "../dtos/user.dto";
+import { CreateUserDTO, LoginUserDTO, UpdateUserDto } from "../dtos/user.dto";
 import { IUser } from "../models/user.model";
 import { HttpException } from "../exceptions/http-exception";
 import bycryptjs from "bcryptjs";
@@ -44,5 +44,29 @@ export class UserService {
             { expiresIn: "30d" }
         );
         return { user, token }
+    }
+
+    async updateUser(id: string, updateData: UpdateUserDto) {
+        const user = await userRepository.getUserById(id);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        if (updateData.email && updateData.email !== user.email) {
+            const existingUserByEmail = await userRepository.getUserByEmail(updateData.email);
+            if (existingUserByEmail) {
+                throw new HttpException(400, "Email already exists");
+            }
+        }
+        if (updateData.username && updateData.username !== user.username) {
+            const existingUserByUsername = await userRepository.getUserByUsername(updateData.username);
+            if (existingUserByUsername) {
+                throw new HttpException(400, "Username already exists");
+            }
+        }
+        if (updateData.password) {
+            updateData.password = await bycryptjs.hash(updateData.password, 10);
+        }
+        const updatedUser = await userRepository.update(id, updateData);
+        return updatedUser;
     }
 }
