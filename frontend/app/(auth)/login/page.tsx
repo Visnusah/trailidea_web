@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
 import GoogleIcon from "@/app/_components/ui/GoogleIcon";
+import { useAuth } from "@/context/AuthContext";
 
 //Demo credentials
 const DEMO_EMAIL = "demo@trailidea.com";
@@ -17,6 +18,7 @@ const DEMO_PASSWORD = "trail2026";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
@@ -87,9 +89,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Store token in localStorage
-      localStorage.setItem("authToken", data.data.token);
-      localStorage.setItem("user", JSON.stringify(data.data.user));
+      // Store token and user in AuthContext
+      await login(data.data.token, data.data.user);
 
       // Redirect to dashboard
       router.push("/dashboard");
