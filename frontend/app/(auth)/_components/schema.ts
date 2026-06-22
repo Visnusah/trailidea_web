@@ -2,16 +2,16 @@
 import { z } from "zod";
 
 export const registerSchema = z.object({
-    email: z.email("Invalid email address"),
-    firstName: z.string("Firstname must be string")
+    email: z.string().email("Invalid email address"),
+    firstName: z.string({ invalid_type_error: "Firstname must be string" })
         .min(2, "First name must be at least 2 characters long"),
-    lastName: z.string("Last name must be string")
+    lastName: z.string({ invalid_type_error: "Last name must be string" })
         .min(2, "Last name must be at least 2 characters long"),
-    username: z.string("Username must be string")
+    username: z.string({ invalid_type_error: "Username must be string" })
         .min(3, "Username must be at least 3 characters long"),
-    password: z.string("Password must be string")
+    password: z.string({ invalid_type_error: "Password must be string" })
         .min(6, "Password must be at least 6 characters long"),
-    confirmPassword: z.string("Confirm Password must be string")
+    confirmPassword: z.string({ invalid_type_error: "Confirm Password must be string" })
         .min(6, "Confirm Password must be at least 6 characters long")
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -21,8 +21,8 @@ export const registerSchema = z.object({
 export type RegisterFormData = z.infer<typeof registerSchema>;
 
 export const loginSchema = z.object({
-    email: z.email("Invalid email address"),
-    password: z.string("Password must be string")
+    email: z.string().email("Invalid email address"),
+    password: z.string({ invalid_type_error: "Password must be string" })
         .min(6, "Password must be at least 6 characters long")
 });
 

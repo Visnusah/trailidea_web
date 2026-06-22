@@ -3,15 +3,19 @@ import { HttpException } from "./exceptions/http-exception";
 import { ApiResponseHelper } from "./utils/apihelper.util";
 import cors from "cors";
 import morgan from "morgan";
+import path from "path";
 
 // routes
 import userRoutes from "./routes/user.route";
+import uploadRoutes from "./routes/upload.route";
+
 
 const app: Application = express();
+
 const corsOptions = {
-    origin: ["http://localhost:3000"], // frontend origin
+    origin: true, // frontend origin, localhost:3000
     credentials: true,
-    successStatus: 200
+    optionsSuccessStatus: 200
 }
 app.use(cors(corsOptions)); // enable CORS for all routes
 
@@ -20,6 +24,11 @@ app.use(express.urlencoded({ extended: true })); // x-www-form-urlencoded
 app.use(morgan("combined")); // log all requests
 
 app.use("/api/v1/auth", userRoutes); // user related routes
+// Serve static files from the "uploads" directory
+app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/api/v1/uploads", uploadRoutes); // upload related routes
+
 
 // global api handler (at the last)
 app.use(

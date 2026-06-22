@@ -1,6 +1,7 @@
 import { UserService } from "../services/user.service";
 import { z } from "zod";
-import { CreateUserDTO, LoginUserDTO } from "../dtos/user.dto";
+import { CreateUserDTO, LoginUserDTO, UpdateUserDto } from "../dtos/user.dto";
+import { HttpException } from "../exceptions/http-exception";
 import { ApiResponseHelper } from "../utils/apihelper.util";
 import { Request, Response } from "express";
 const userService = new UserService();
@@ -11,7 +12,7 @@ export class UserController {
             const userData = CreateUserDTO.safeParse(req.body);
             if (!userData.success) {
                 return ApiResponseHelper
-                    .error(res, z.prettifyError(userData.error), 400);
+                    .error(res, userData.error.errors.map(e => e.message).join(", "), 400);
             }
             const user = await userService.createUser(userData.data);
             return ApiResponseHelper.success(res, user, "User created successfully");
@@ -29,7 +30,7 @@ export class UserController {
             const parsedData = LoginUserDTO.safeParse(req.body);
             if (!parsedData.success) {
                 return ApiResponseHelper
-                    .error(res, z.prettifyError(parsedData.error), 400);
+                    .error(res, parsedData.error.errors.map(e => e.message).join(", "), 400);
             }
             const { user, token } = await userService.loginUser(parsedData.data);
             return ApiResponseHelper.success(res, { user, token }, "Login successful");
@@ -38,6 +39,52 @@ export class UserController {
                 res,
                 error.message || "Internal Server Error",
                 error.status || 500
+            );
+        }
+    }
+
+    async updateUser(req: Request, res: Response) {
+        try {
+            const userId = req.user?._id?.toString();
+            if (!userId) {
+                throw new HttpException(401, "Unauthorized");
+            }
+            const filename = req.file?.filename;
+            const parseResult = UpdateUserDto.safeParse(req.body);
+            if (!parseResult.success) {
+                return ApiResponseHelper.error(
+                    res,
+                    parseResult.error.errors.map(e => e.message).join(", "),
+                    400
+                );
+            }
+            const updateData = {
+                ...parseResult.data,
+                ...(filename && { imageUrl: "/uploads/" + filename })
+            };
+            const updatedUser = await userService.updateUser(userId, updateData);
+            return ApiResponseHelper.success(res, updatedUser, "User updated successfully");
+        } catch (e: any) {
+            return ApiResponseHelper.error(
+                res,
+                e?.message || "Failed to update user",
+                e.status || 500
+            );
+        }
+    }
+
+    async whoami(req: Request, res: Response) {
+        try {
+            const user = req.user;
+            if (!user) {
+                throw new HttpException(401, "Unauthorized");
+            }
+            return ApiResponseHelper.success(res, user, "User info retrieved");
+        } catch (e: any) {
+            return ApiResponseHelper.error(
+                res,
+                e?.message || "Failed to get user info",
+                e.status || 500
             );
         }
     }
