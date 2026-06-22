@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { getWhoAmI, updateProfile } from "@/lib/api/auth";
 import { setTokenCookie, storeUserData, clearAuthCookies } from "@/lib/cookies";
+import { useRouter } from "next/navigation";
 
 interface AuthContextType {
     user: any;
@@ -20,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<any>(null);
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const router = useRouter();
 
     // Initialize state from localStorage
     useEffect(() => {
@@ -45,7 +47,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             }
                         } catch (err) {
                             console.error("Session verification failed, logging out:", err);
-                            await logout();
+                            // Clear stale auth data
+                            setToken(null);
+                            setUser(null);
+                            localStorage.removeItem("authToken");
+                            localStorage.removeItem("user");
+                            await clearAuthCookies();
                         }
                     }
                 }
@@ -78,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.removeItem("user");
             await clearAuthCookies();
         }
+        router.push("/login");
     };
 
     const refreshUser = async () => {
