@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import uploads from "../middlewares/upload.middleware";
 import { HttpException } from "../exceptions/http-exception";
 import { ApiResponseHelper } from "../utils/apihelper.util";
@@ -10,15 +10,18 @@ const router = Router();
 router.post(
     "/upload",
     uploads.single("image"),
-    (req, res) => {
+    (req: Request, res: Response) => {
     try {
         if(!req.file){
             throw new HttpException(400, "No file uploaded");
         }
-        req.file.path = "/uploads/" + req.file.path; // set file path for response
-        return ApiResponseHelper.success(res, req.file, "File uploaded successfully");
-    } catch (error) {
-        return ApiResponseHelper.error(res, error.message, error.status);
+        const fileData = {
+            ...req.file,
+            path: "/uploads/" + req.file.filename
+        };
+        return ApiResponseHelper.success(res, fileData, "File uploaded successfully");
+    } catch (error: any) {
+        return ApiResponseHelper.error(res, error?.message || "Upload failed", error?.status || 500);
     }
 });
 
