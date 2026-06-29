@@ -88,4 +88,34 @@ export class UserController {
             );
         }
     }
+
+
+    async sendResetPasswordEmail(req: Request, res: Response) {
+        try {
+            const email = req.body.email;
+            // can be replaced with DTO
+            if (!email) {
+                throw new HttpException(400, "Email is required");
+            }
+            const { token, user } = await userService.sendResetPasswordEmail(email);
+            return ApiResponseHelper.success(res,
+                { token, user }, "Reset password email sent successfully", 200);
+        } catch (error: Error | any) {
+            return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
+        }
+    }
+    async resetPassword(req: Request, res: Response) {
+        try {
+            const token = req.params.token as string;
+            const { newPassword } = req.body;
+            // can be replaced with DTO
+            if (!token || !newPassword) {
+                throw new HttpException(400, "Token and new password are required");
+            }
+            const updatedUser = await userService.resetPassword(token, newPassword);
+            return ApiResponseHelper.success(res, updatedUser, "Password reset successfully", 200);
+        } catch (error: Error | any) {
+            return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
+        }
+    }
 }

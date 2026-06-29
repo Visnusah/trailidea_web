@@ -43,3 +43,22 @@ export const updateProfile = async (data: any) => {
         throw new Error(error?.response?.data?.message || 'Profile update failed');
     }
 }
+
+
+export const requestPasswordReset = async (email: string) => {
+    try {
+        const response = await axiosInstance.post("/api/v1/auth/request-password-reset", { email });
+        return response.data;
+    } catch (error: Error | any) {
+        throw new Error(error?.response?.data?.message || 'Request password reset failed');
+    }
+}
+
+export const resetPassword = async (token: string, newPassword: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/v1/auth/reset-password/${token}`, { newPassword });
+        return response.data;
+    } catch (error: Error | any) {
+        throw new Error(error?.response?.data?.message || 'Reset password failed');
+    }
+}
