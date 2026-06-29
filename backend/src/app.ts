@@ -8,6 +8,7 @@ import path from "path";
 // routes
 import userRoutes from "./routes/user.route";
 import uploadRoutes from "./routes/upload.route";
+import adminUserRoutes from "./routes/admin.user.route";
 
 
 const app: Application = express();
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true })); // x-www-form-urlencoded
 app.use(morgan("combined")); // log all requests
 
 app.use("/api/v1/auth", userRoutes); // user related routes
+app.use("/api/v1/admin/users", adminUserRoutes); // admin user management
 // Serve static files from the "uploads" directory
 app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

@@ -63,6 +63,19 @@ export default function DashboardNavbar() {
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>notifications</span>
           </button>
 
+          {user?.role === "admin" && (
+            <Link
+              href="/admin/users"
+              className="dash-navbar__admin-link"
+              title="Admin Panel"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                shield
+              </span>
+              Admin
+            </Link>
+          )}
+
           <Link href="/dashboard/profile">
             <img
               src={getAvatarUrl()}

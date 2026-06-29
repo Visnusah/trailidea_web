@@ -1,5 +1,5 @@
 "use server"; // server side api call
-import { register, login } from "@/lib/api/auth";
+import { register, login, requestPasswordReset, resetPassword } from "@/lib/api/auth";
 import { LoginFormData, RegisterFormData } from "@/app/(auth)/_components/schema";
 import { setTokenCookie, storeUserData } from "@/lib/cookies";
 
@@ -33,5 +33,31 @@ export const handleLoginUser = async (data: LoginFormData) => {
         }
     }catch (error: Error | any){
         return { success: false, message: error?.message || 'Login failed' };    
+    }
+}
+
+export const handleRequestPasswordReset = async (email: string) => {
+    try{
+        const result = await requestPasswordReset(email);
+        if(result.success){
+            return { success: true, message: result.message };
+        }else{
+            return { success: false, message: result.message || 'Request password reset failed' };    
+        }
+    }catch (error: Error | any){
+        return { success: false, message: error?.message || 'Request password reset failed' };
+    }
+}
+
+export const handleResetPassword = async (token: string, newPassword: string) => {
+    try{
+        const result = await resetPassword(token, newPassword);
+        if(result.success){
+            return { success: true, message: result.message };
+        }else{
+            return { success: false, message: result.message || 'Reset password failed' };    
+        }
+    }catch (error: Error | any){
+        return { success: false, message: error?.message || 'Reset password failed' };
     }
 }
