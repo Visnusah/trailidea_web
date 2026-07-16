@@ -25,4 +25,10 @@ export const API = {
             DELETE: (id: string): string => `/api/v1/admin/users/${id}`,
         },
     },
+    POSTS: {
+        CREATE: "/api/v1/posts",
+        FEED: "/api/v1/posts",
+        VOTE: (id: string): string => `/api/v1/posts/${id}/vote`,
+        COMMENTS: (id: string) => `/api/v1/posts/${id}/comments`,
+    },
 };

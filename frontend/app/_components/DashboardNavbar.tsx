@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/app/context/AuthContext";
 import { usePathname } from "next/navigation";
 
 export default function DashboardNavbar() {
@@ -14,11 +14,16 @@ export default function DashboardNavbar() {
   };
 
   const navLinks = [
-    { href: "/dashboard", label: "Discover" },
-    { href: "/dashboard", label: "Feed", exact: true },
-    { href: "#", label: "Community" },
-    { href: "#", label: "About" },
+    { href: "/dashboard", label: "Feed", icon: "dynamic_feed", exact: true },
+    { href: "/dashboard/map", label: "Map", icon: "map", exact: false },
+    { href: "/dashboard/post", label: "Post", icon: "add_circle", exact: false },
+    { href: "/dashboard/profile", label: "Profile", icon: "person", exact: false },
   ];
+
+  const isActive = (link: { href: string; exact?: boolean }) => {
+    if (link.exact) return pathname === link.href;
+    return pathname.startsWith(link.href);
+  };
 
   return (
     <header className="dash-navbar">
@@ -34,35 +39,21 @@ export default function DashboardNavbar() {
             <Link
               key={link.label}
               href={link.href}
-              className={`dash-navbar__link ${
-                link.exact
-                  ? pathname === link.href
-                    ? "dash-navbar__link--active"
-                    : ""
-                  : pathname.startsWith(link.href) && link.href !== "/dashboard"
-                  ? "dash-navbar__link--active"
-                  : ""
-              }`}
+              className={`dash-navbar__link ${isActive(link) ? "dash-navbar__link--active" : ""}`}
             >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 20 }}
+              >
+                {link.icon}
+              </span>
               {link.label}
             </Link>
           ))}
         </nav>
 
-        {/* Search */}
-        <div className="dash-navbar__search">
-          <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--color-outline)" }}>
-            search
-          </span>
-          <input type="text" placeholder="Search trails..." />
-        </div>
-
         {/* Actions */}
         <div className="dash-navbar__actions">
-          <button className="dash-navbar__icon-btn" aria-label="Notifications">
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>notifications</span>
-          </button>
-
           {user?.role === "admin" && (
             <Link
               href="/admin/users"
@@ -82,10 +73,6 @@ export default function DashboardNavbar() {
               alt={user?.username || "User"}
               className="dash-navbar__avatar"
             />
-          </Link>
-
-          <Link href="#" className="dash-navbar__cta">
-            Start Trail
           </Link>
         </div>
       </div>
