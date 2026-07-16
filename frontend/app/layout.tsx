@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider } from "@/app/context/AuthContext";
 import { Toaster } from "react-hot-toast";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
