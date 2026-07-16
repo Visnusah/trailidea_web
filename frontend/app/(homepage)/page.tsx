@@ -1,11 +1,15 @@
-import Navbar from "@/app/_components/Navbar";
-import Footer from "@/app/_components/Footer";
-
+import HeroSection from "./_components/HeroSection";
+import TrailCategories from "./_components/TrailCategories";
+import PopularTrails from "./_components/PopularTrails";
+import CommunityStats from "./_components/CommunityStats";
 
 export default function Home() {
   return (
     <>
-      Homepage
+      <HeroSection />
+      <TrailCategories />
+      <PopularTrails />
+      <CommunityStats />
     </>
   );
 }

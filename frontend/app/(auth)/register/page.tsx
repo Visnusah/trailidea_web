@@ -278,7 +278,7 @@ export default function RegisterPage() {
                     id="reg-firstname"
                     type="text"
                     className={`form-input${fieldErrors.firstName ? " form-input--error" : ""}`}
-                    placeholder="Alex"
+                    placeholder="first name"
                     autoComplete="given-name"
                     value={formData.firstName}
                     onChange={handleChange("firstName")}
@@ -312,7 +312,7 @@ export default function RegisterPage() {
                     id="reg-lastname"
                     type="text"
                     className={`form-input${fieldErrors.lastName ? " form-input--error" : ""}`}
-                    placeholder="Rivers"
+                    placeholder="last name"
                     autoComplete="family-name"
                     value={formData.lastName}
                     onChange={handleChange("lastName")}
@@ -347,7 +347,7 @@ export default function RegisterPage() {
                   id="reg-username"
                   type="text"
                   className={`form-input${fieldErrors.username ? " form-input--error" : ""}`}
-                  placeholder="trailblazer_99"
+                  placeholder="username"
                   autoComplete="username"
                   value={formData.username}
                   onChange={handleChange("username")}
@@ -381,7 +381,7 @@ export default function RegisterPage() {
                   id="reg-email"
                   type="email"
                   className={`form-input${fieldErrors.email ? " form-input--error" : ""}`}
-                  placeholder="alex@trailidea.com"
+                  placeholder="email address"
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange("email")}
