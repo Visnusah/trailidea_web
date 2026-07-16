@@ -20,5 +20,15 @@ export const LoginUserDTO = UserSchema.pick({
 export type LoginUserDTO = z.infer<typeof LoginUserDTO>;
 
 
-export const UpdateUserDto = UserSchema.partial();
+export const UpdateUserDto = UserSchema.pick({
+    firstName: true,
+    lastName: true,
+    email: true,
+    username: true,
+    password: true,
+    imageUrl: true,
+    bio: true,
+    coverImageUrl: true,
+    preferredTerrains: true,
+}).partial();
 export type UpdateUserDto = z.infer<typeof UpdateUserDto>;

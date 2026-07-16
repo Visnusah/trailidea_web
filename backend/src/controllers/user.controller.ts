@@ -4,7 +4,10 @@ import { CreateUserDTO, LoginUserDTO, UpdateUserDto } from "../dtos/user.dto";
 import { HttpException } from "../exceptions/http-exception";
 import { ApiResponseHelper } from "../utils/apihelper.util";
 import { Request, Response } from "express";
+import { UserMongoRepository } from "../repositories/user.repository";
+
 const userService = new UserService();
+const userRepo = new UserMongoRepository();
 
 export class UserController {
     async createUser(req: Request, res: Response) {
@@ -49,8 +52,26 @@ export class UserController {
             if (!userId) {
                 throw new HttpException(401, "Unauthorized");
             }
-            const filename = req.file?.filename;
-            const parseResult = UpdateUserDto.safeParse(req.body);
+
+            // Handle both single file and fields upload
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+            const profilePicFile = files?.["profile_pic"]?.[0];
+            const coverPicFile = files?.["cover_pic"]?.[0];
+
+            // Also handle legacy single file upload
+            const singleFile = req.file;
+
+            // Parse preferredTerrains from JSON string if sent via FormData
+            let bodyToParse = { ...req.body };
+            if (bodyToParse.preferredTerrains && typeof bodyToParse.preferredTerrains === "string") {
+                try {
+                    bodyToParse.preferredTerrains = JSON.parse(bodyToParse.preferredTerrains);
+                } catch {
+                    bodyToParse.preferredTerrains = [];
+                }
+            }
+
+            const parseResult = UpdateUserDto.safeParse(bodyToParse);
             if (!parseResult.success) {
                 return ApiResponseHelper.error(
                     res,
@@ -58,10 +79,22 @@ export class UserController {
                     400
                 );
             }
-            const updateData = {
+
+            const updateData: any = {
                 ...parseResult.data,
-                ...(filename && { imageUrl: "/uploads/" + filename })
             };
+
+            // Set profile pic URL
+            const profilePicFilename = profilePicFile?.filename || singleFile?.filename;
+            if (profilePicFilename) {
+                updateData.imageUrl = "/uploads/" + profilePicFilename;
+            }
+
+            // Set cover pic URL
+            if (coverPicFile?.filename) {
+                updateData.coverImageUrl = "/uploads/" + coverPicFile.filename;
+            }
+
             const updatedUser = await userService.updateUser(userId, updateData);
             return ApiResponseHelper.success(res, updatedUser, "User updated successfully");
         } catch (e: any) {
@@ -89,6 +122,90 @@ export class UserController {
         }
     }
 
+    /**
+     * POST /api/v1/auth/users/:id/follow
+     * Toggle follow/unfollow a user.
+     */
+    async toggleFollow(req: Request, res: Response) {
+        try {
+            const currentUserId = req.user?._id?.toString();
+            if (!currentUserId) {
+                throw new HttpException(401, "Unauthorized");
+            }
+            const { id: targetUserId } = req.params;
+            if (currentUserId === targetUserId) {
+                throw new HttpException(400, "You cannot follow yourself");
+            }
+            const result = await userRepo.toggleFollow(targetUserId, currentUserId);
+            return ApiResponseHelper.success(
+                res,
+                result,
+                result.isFollowing ? "Followed successfully" : "Unfollowed successfully"
+            );
+        } catch (e: any) {
+            return ApiResponseHelper.error(
+                res,
+                e?.message || "Failed to toggle follow",
+                e.status || 500
+            );
+        }
+    }
+
+    /**
+     * GET /api/v1/auth/users/profile/:username
+     * Get public profile by username, along with their posts.
+     */
+    async getPublicProfile(req: Request, res: Response) {
+        try {
+            const { username } = req.params;
+            const profile = await userRepo.getProfileByUsername(username);
+            if (!profile) {
+                throw new HttpException(404, "User not found");
+            }
+
+            // Also fetch the user's posts
+            const { posts, total } = await userRepo.getPostsByAuthor(
+                profile._id.toString(),
+                1,
+                20
+            );
+
+            return ApiResponseHelper.success(res, {
+                user: profile,
+                posts,
+                totalPosts: total,
+                followersCount: profile.followers?.length || 0,
+                followingCount: profile.following?.length || 0,
+            }, "Profile fetched successfully");
+        } catch (e: any) {
+            return ApiResponseHelper.error(
+                res,
+                e?.message || "Failed to fetch profile",
+                e.status || 500
+            );
+        }
+    }
+
+    /**
+     * GET /api/v1/auth/users/me/saved
+     * Get authenticated user's saved posts.
+     */
+    async getSavedPosts(req: Request, res: Response) {
+        try {
+            const userId = req.user?._id?.toString();
+            if (!userId) {
+                throw new HttpException(401, "Unauthorized");
+            }
+            const savedPosts = await userRepo.getSavedPosts(userId);
+            return ApiResponseHelper.success(res, savedPosts, "Saved posts fetched successfully");
+        } catch (e: any) {
+            return ApiResponseHelper.error(
+                res,
+                e?.message || "Failed to fetch saved posts",
+                e.status || 500
+            );
+        }
+    }
 
     async sendResetPasswordEmail(req: Request, res: Response) {
         try {
