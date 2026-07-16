@@ -9,6 +9,11 @@ export const API = {
         REQUEST_PASSWORD_RESET: "/api/v1/auth/request-password-reset",
         RESET_PASSWORD: (token: string): string => `/api/v1/auth/reset-password/${token}`,
     },
+    USERS: {
+        FOLLOW: (id: string) => `/api/v1/auth/users/${id}/follow`,
+        PROFILE: (username: string) => `/api/v1/auth/users/profile/${username}`,
+        SAVED_POSTS: "/api/v1/auth/users/me/saved",
+    },
     ADMIN: {
         BLOG: {
             GET: "/api/v1/admin/blogs",
@@ -30,5 +35,7 @@ export const API = {
         FEED: "/api/v1/posts",
         VOTE: (id: string): string => `/api/v1/posts/${id}/vote`,
         COMMENTS: (id: string) => `/api/v1/posts/${id}/comments`,
+        SAVE: (id: string) => `/api/v1/posts/${id}/save`,
+        UPDATE: (id: string): string => `/api/v1/posts/${id}`,
     },
 };

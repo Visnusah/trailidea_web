@@ -1782,21 +1782,23 @@
 
 .profile-header {
   max-width: 1320px;
-  margin: -70px auto 0;
+  margin: 0 auto;
   padding: 0 24px;
   position: relative;
   z-index: 5;
 }
 
-.profile-header__top {
+.profile-header__avatar-row {
   display: flex;
+  justify-content: space-between;
   align-items: flex-end;
-  gap: 20px;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .profile-avatar-wrap {
   position: relative;
+  margin-top: -60px; /* Pulls avatar up to overlap banner cleanly */
+  z-index: 10;
   flex-shrink: 0;
 }
 
@@ -1833,43 +1835,26 @@
 }
 
 .profile-header__info {
-  flex: 1;
-  min-width: 0;
-  padding-bottom: 8px;
-}
-
-.profile-header__name-row {
+  margin-top: 16px;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .profile-header__name {
   font-family: var(--font-family);
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--color-on-surface);
-}
-
-.trust-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  background: var(--color-success);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  line-height: 1.2;
 }
 
 .profile-header__bio {
   font-size: 14px;
   color: var(--color-on-surface-variant);
-  line-height: 1.6;
-  max-width: 480px;
+  line-height: 1.5;
+  max-width: 600px;
+  margin-top: 8px;
   margin-bottom: 4px;
 }
 
@@ -1877,8 +1862,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: auto;
-  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .profile-settings-btn {
@@ -1929,7 +1913,7 @@
   margin: 28px auto 60px;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 280px 1fr; /* Increased from 220px to prevent stats from squishing */
   gap: 28px;
   align-items: start;
 }
@@ -1943,37 +1927,39 @@
 /* Profile Stats Bar */
 .profile-stats {
   display: flex;
-  gap: 0;
+  justify-content: space-around;
   background: var(--color-surface-container-lowest);
   border-radius: var(--radius-xl);
-  padding: 20px 24px;
-  box-shadow: var(--shadow-card);
+  padding: 16px;
+  border: 1px solid var(--color-outline-variant);
   margin-bottom: 20px;
 }
 
 .profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   flex: 1;
-  text-align: center;
 }
 
 .profile-stat+.profile-stat {
-  border-left: 1.5px solid var(--color-outline-variant);
+  border-left: 1px solid var(--color-outline-variant);
 }
 
 .profile-stat__value {
   font-family: var(--font-family);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--color-on-surface);
 }
 
 .profile-stat__label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--color-outline);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-top: 2px;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
 }
 
 /* About Card */
@@ -2101,6 +2087,60 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
+}
+
+/* Terrain Selector Grid Settings */
+.terrain-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.terrain-selector__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.terrain-selector__chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+}
+
+.terrain-selector__chip--active {
+  border-color: var(--color-secondary);
+  background: var(--color-secondary-container);
+  color: var(--color-on-secondary-container);
+}
+
+.terrain-selector__chip--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--color-surface-container-low);
+  border-color: var(--color-outline-variant);
+}
+
+.profile-header__username {
+  font-size: 15px;
+  color: var(--color-outline);
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.post-card__action--saved {
+  color: var(--color-primary) !important;
+  font-weight: 600;
 }
 
 .profile-trail-card {
@@ -4068,4 +4108,199 @@
 .comment-submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ============ INSTAGRAM GRID VIEW ============ */
+.instagram-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.instagram-grid__item {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--color-surface-container-low);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  border: 1px solid var(--color-outline-variant);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.instagram-grid__item:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow-elevation-small);
+}
+
+.instagram-grid__img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.instagram-grid__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 12px;
+  text-align: center;
+  color: var(--color-on-surface-variant);
+}
+
+.instagram-grid__placeholder span {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.instagram-grid__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  opacity: 0;
+  color: #fff;
+  transition: opacity 0.2s;
+}
+
+.instagram-grid__item:hover .instagram-grid__overlay {
+  opacity: 1;
+}
+
+.instagram-grid__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ============ REORDER CONTROLS ============ */
+.reorder-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.reorder-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-outline-variant);
+  overflow: hidden;
+  background: var(--color-surface-container-low);
+}
+
+.reorder-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reorder-item__controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: space-around;
+  padding: 4px;
+}
+
+.reorder-item__btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.reorder-item__btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.reorder-item__btn span {
+  font-size: 16px !important;
+}
+
+/* ============ POST DETAILS MODAL ============ */
+.post-detail-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.post-detail-modal {
+  background: var(--color-surface-container-lowest);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-elevation-large);
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalEnter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.post-detail-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.post-detail-modal__body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.post-detail-modal__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-outline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.post-detail-modal__close:hover {
+  background: var(--color-surface-container-low);
+}
+
+.edited-tag {
+  font-size: 12px;
+  color: var(--color-outline);
+  font-style: italic;
+  margin-top: 4px;
+  display: inline-block;
 }

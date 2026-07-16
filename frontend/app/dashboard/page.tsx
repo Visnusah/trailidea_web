@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord } from "@/lib/api/posts";
+import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord, toggleSavePost } from "@/lib/api/posts";
 import { useAuth } from "@/app/context/AuthContext";
 import toast from "react-hot-toast";
 import Link from "next/link";
@@ -51,7 +51,15 @@ const ReadMoreText = ({ text, maxLength = 150 }: { text: string; maxLength?: num
 };
 
 // ── Comment Modal Component ──
-const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void }) => {
+const CommentModal = ({ 
+  postId, 
+  onClose, 
+  onCommentAdded 
+}: { 
+  postId: string; 
+  onClose: () => void; 
+  onCommentAdded?: (comment: CommentRecord) => void;
+}) => {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +93,9 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
       const res = await createComment(postId, text);
       setComments([...comments, res.data]);
       setText("");
+      if (onCommentAdded) {
+        onCommentAdded(res.data);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to add comment");
     } finally {
@@ -152,7 +163,7 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
 };
 
 export default function FeedPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -242,6 +253,20 @@ export default function FeedPage() {
     }
   };
 
+  const handleSave = async (postId: string) => {
+    if (!user) {
+      toast.error("Please login to save posts");
+      return;
+    }
+    try {
+      const res = await toggleSavePost(postId);
+      toast.success(res.data.isSaved ? "Post saved successfully" : "Post unsaved successfully");
+      await refreshUser();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save post");
+    }
+  };
+
   const handleShare = (postId: string) => {
     const url = `${window.location.origin}/dashboard/post/${postId}`;
     navigator.clipboard.writeText(url)
@@ -291,6 +316,11 @@ export default function FeedPage() {
                 const hasUpvoted = user ? post.upvotes.includes(user._id) : false;
                 const hasDownvoted = user ? post.downvotes.includes(user._id) : false;
 
+                const isSaved = user?.savedPosts?.some((id: any) => {
+                  const targetId = typeof id === "string" ? id : id?._id?.toString() || id?.toString();
+                  return targetId === post._id;
+                });
+
                 return (
                   <article key={post._id} className="post-card">
                     {/* Voting Panel */}
@@ -320,7 +350,7 @@ export default function FeedPage() {
                     <div className="post-card__content">
                       <div className="post-card__meta">
                         <img 
-                          src={post.author.imageUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
+                          src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
                           alt={post.author.username} 
                           className="post-card__avatar"
                         />
@@ -361,15 +391,57 @@ export default function FeedPage() {
                         </div>
                       )}
 
+                      {/* Inline Comment Snippet */}
+                      {post.latestComment && (
+                        <div 
+                          className="post-card__comment-snippet" 
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "8px",
+                            background: "var(--color-surface-container-low)",
+                            padding: "10px 12px",
+                            borderRadius: "var(--radius-md)",
+                            marginTop: "12px",
+                            fontSize: "13px",
+                            cursor: "pointer"
+                          }} 
+                          onClick={() => setActiveCommentPostId(post._id)}
+                        >
+                          <img 
+                            src={post.latestComment.author?.imageUrl ? `http://localhost:8089${post.latestComment.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.latestComment.author?.username || "user"}`} 
+                            alt={post.latestComment.author?.username} 
+                            style={{ width: "20px", height: "20px", borderRadius: "50%", objectFit: "cover" }}
+                          />
+                          <div>
+                            <span style={{ fontWeight: "700", marginRight: "6px", color: "var(--color-on-surface)" }}>
+                              {post.latestComment.author?.username || "explorer"}:
+                            </span>
+                            <span style={{ color: "var(--color-on-surface-variant)" }}>
+                              {post.latestComment.text}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Toolbar */}
                       <div className="post-card__toolbar">
                         <button className="post-card__action" onClick={() => setActiveCommentPostId(post._id)}>
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chat_bubble_outline</span>
-                          Comment
+                          {post.commentCount || 0} Comments
                         </button>
                         <button className="post-card__action" onClick={() => handleShare(post._id)}>
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>share</span>
                           Share
+                        </button>
+                        <button 
+                          className={`post-card__action ${isSaved ? "post-card__action--saved" : ""}`} 
+                          onClick={() => handleSave(post._id)}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            {isSaved ? "bookmark" : "bookmark_border"}
+                          </span>
+                          {isSaved ? "Saved" : "Save"}
                         </button>
                       </div>
                     </div>
@@ -439,6 +511,18 @@ export default function FeedPage() {
         <CommentModal 
           postId={activeCommentPostId} 
           onClose={() => setActiveCommentPostId(null)} 
+          onCommentAdded={(newComment) => {
+            setPosts((prevPosts) =>
+              prevPosts.map((post) => {
+                if (post._id !== activeCommentPostId) return post;
+                return {
+                  ...post,
+                  commentCount: (post.commentCount || 0) + 1,
+                  latestComment: newComment,
+                };
+              })
+            );
+          }}
         />
       )}
     </>

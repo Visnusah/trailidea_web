@@ -1,13 +1,17 @@
 import { Request, Response } from "express";
 import { PostService } from "../services/post.service";
-import { CreatePostDTO, VoteDTO, FeedPaginationQueryDTO } from "../dtos/post.dto";
+import { CreatePostDTO, VoteDTO, FeedPaginationQueryDTO, EditPostDTO } from "../dtos/post.dto";
 import { ApiResponseHelper } from "../utils/apihelper.util";
 import { HttpException } from "../exceptions/http-exception";
 import { CreateCommentDTO } from "../dtos/comment.dto";
 import { CommentMongoRepository } from "../repositories/comment.repository";
+import { UserMongoRepository } from "../repositories/user.repository";
+import { PostMongoRepository } from "../repositories/post.repository";
 
 const postService = new PostService();
 const commentRepo = new CommentMongoRepository();
+const userRepo = new UserMongoRepository();
+const postRepo = new PostMongoRepository();
 
 export class PostController {
     /**
@@ -68,7 +72,7 @@ export class PostController {
 
     /**
      * GET /api/v1/posts?page=1&limit=10
-     * Fetch paginated feed posts.
+     * Fetch paginated feed posts (enriched with commentCount and latestComment).
      */
     async getFeed(req: Request, res: Response) {
         try {
@@ -133,6 +137,32 @@ export class PostController {
     }
 
     /**
+     * POST /api/v1/posts/:id/save
+     * Toggle saving a post.
+     */
+    async toggleSavePost(req: Request, res: Response) {
+        try {
+            const userId = req.user?._id?.toString();
+            if (!userId) {
+                throw new HttpException(401, "Unauthorized");
+            }
+            const { id } = req.params;
+            const result = await userRepo.toggleSavePost(userId, id);
+            return ApiResponseHelper.success(
+                res,
+                result,
+                result.isSaved ? "Post saved" : "Post unsaved"
+            );
+        } catch (error: any) {
+            return ApiResponseHelper.error(
+                res,
+                error.message || "Internal Server Error",
+                error.status || 500
+            );
+        }
+    }
+
+    /**
      * POST /api/v1/posts/:id/comments
      * Add a comment to a post
      */
@@ -179,6 +209,96 @@ export class PostController {
             const comments = await commentRepo.getByPostId(id);
 
             return ApiResponseHelper.success(res, comments, "Comments fetched successfully", 200);
+        } catch (error: any) {
+            return ApiResponseHelper.error(
+                res,
+                error.message || "Internal Server Error",
+                error.status || 500
+            );
+        }
+    }
+
+    /**
+     * PUT /api/v1/posts/:id
+     * Edit a post. Supports text and image addition, deletion, and rearrangement.
+     */
+    async editPost(req: Request, res: Response) {
+        try {
+            const userId = req.user?._id?.toString();
+            if (!userId) {
+                throw new HttpException(401, "Unauthorized");
+            }
+
+            const { id } = req.params;
+            const existingPost = await postRepo.getById(id);
+            if (!existingPost) {
+                throw new HttpException(404, "Post not found");
+            }
+
+            if (existingPost.author._id.toString() !== userId) {
+                throw new HttpException(403, "Forbidden: You are not the author of this post");
+            }
+
+            // Parse links and other body arrays
+            let linksArray: string[] = [];
+            if (req.body.links) {
+                try {
+                    linksArray = typeof req.body.links === "string"
+                        ? JSON.parse(req.body.links)
+                        : req.body.links;
+                } catch {
+                    linksArray = [];
+                }
+            }
+
+            const bodyToParse = {
+                ...req.body,
+                links: linksArray,
+            };
+
+            const parsed = EditPostDTO.safeParse(bodyToParse);
+            if (!parsed.success) {
+                return ApiResponseHelper.error(
+                    res,
+                    parsed.error.errors.map((e) => e.message).join(", "),
+                    400
+                );
+            }
+
+            // Handle image order/rearrangement
+            let imageUrls = existingPost.imageUrls || [];
+            
+            // Extract uploaded files
+            const files = req.files as Express.Multer.File[] | undefined;
+            const newUploads = files ? files.map((file) => "/uploads/" + file.filename) : [];
+
+            if (parsed.data.imageOrder) {
+                try {
+                    const order = JSON.parse(parsed.data.imageOrder) as string[];
+                    // Map order array: replace "new_i" with the i-th uploaded file path
+                    imageUrls = order.map((item) => {
+                        if (item.startsWith("new_")) {
+                            const index = parseInt(item.split("_")[1], 10);
+                            return newUploads[index] || "";
+                        }
+                        return item;
+                    }).filter((url) => url !== "");
+                } catch (e) {
+                    imageUrls = [...imageUrls, ...newUploads];
+                }
+            } else {
+                imageUrls = [...imageUrls, ...newUploads];
+            }
+
+            const updatedFields: any = {
+                ...parsed.data,
+                imageUrls,
+                isEdited: true,
+            };
+            delete updatedFields.imageOrder;
+
+            const updatedPost = await postRepo.update(id, updatedFields);
+            return ApiResponseHelper.success(res, updatedPost, "Post updated successfully", 200);
         } catch (error: any) {
             return ApiResponseHelper.error(
                 res,

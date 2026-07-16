@@ -6,6 +6,7 @@ export interface IPost extends PostType, Document {
     author: mongoose.Types.ObjectId;
     upvotes: mongoose.Types.ObjectId[];
     downvotes: mongoose.Types.ObjectId[];
+    isEdited: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -21,6 +22,7 @@ const PostMongoSchema: Schema = new Schema<IPost>(
         author: { type: Schema.Types.ObjectId, ref: "User", required: true },
         upvotes: [{ type: Schema.Types.ObjectId, ref: "User" }],
         downvotes: [{ type: Schema.Types.ObjectId, ref: "User" }],
+        isEdited: { type: Boolean, default: false },
     },
     {
         timestamps: true, // createdAt and updatedAt will be automatically added and managed by mongoose

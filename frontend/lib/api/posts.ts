@@ -11,6 +11,15 @@ export interface PostAuthor {
     imageUrl?: string;
 }
 
+export interface CommentRecord {
+    _id: string;
+    postId: string;
+    text: string;
+    author: PostAuthor;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface PostRecord {
     _id: string;
     title: string;
@@ -22,15 +31,9 @@ export interface PostRecord {
     author: PostAuthor;
     upvotes: string[];
     downvotes: string[];
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CommentRecord {
-    _id: string;
-    postId: string;
-    text: string;
-    author: PostAuthor;
+    commentCount: number;
+    latestComment: CommentRecord | null;
+    isEdited?: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -120,5 +123,32 @@ export const createComment = async (postId: string, text: string): Promise<{ dat
         return response.data;
     } catch (error: any) {
         throw new Error(error?.response?.data?.message || "Failed to add comment");
+    }
+};
+
+/** POST /api/v1/posts/:id/save — Toggle save/unsave */
+export const toggleSavePost = async (postId: string): Promise<{ data: { isSaved: boolean } }> => {
+    try {
+        const response = await axiosInstance.post(API.POSTS.SAVE(postId));
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error?.response?.data?.message || "Failed to toggle save");
+    }
+};
+
+/** PUT /api/v1/posts/:id — Edit a post */
+export const updatePost = async (
+    postId: string,
+    formData: FormData
+): Promise<{ data: PostRecord }> => {
+    try {
+        const response = await axiosInstance.put(API.POSTS.UPDATE(postId), formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error?.response?.data?.message || "Failed to update post");
     }
 };

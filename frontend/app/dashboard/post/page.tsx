@@ -61,6 +61,26 @@ export default function CreatePostPage() {
     setPreviews(updatedFiles.map((file) => URL.createObjectURL(file)));
   };
 
+  const moveImage = (index: number, direction: "left" | "right") => {
+    if (direction === "left" && index === 0) return;
+    if (direction === "right" && index === selectedFiles.length - 1) return;
+
+    const targetIndex = direction === "left" ? index - 1 : index + 1;
+
+    const newFiles = [...selectedFiles];
+    const tempFile = newFiles[index];
+    newFiles[index] = newFiles[targetIndex];
+    newFiles[targetIndex] = tempFile;
+
+    const newPreviews = [...previews];
+    const tempPreview = newPreviews[index];
+    newPreviews[index] = newPreviews[targetIndex];
+    newPreviews[targetIndex] = tempPreview;
+
+    setSelectedFiles(newFiles);
+    setPreviews(newPreviews);
+  };
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -94,7 +114,7 @@ export default function CreatePostPage() {
         formData.append("links", JSON.stringify(validLinks));
       }
 
-      // Append image files
+      // Append image files in their current rearranged order
       selectedFiles.forEach((file) => {
         formData.append("images", file);
       });
@@ -208,22 +228,40 @@ export default function CreatePostPage() {
               />
             </div>
 
-            {/* Previews */}
+            {/* Previews with reordering controls */}
             {previews.length > 0 && (
-              <div className="post-form__previews">
+              <div className="reorder-container">
                 {previews.map((src, i) => (
-                  <div key={i} className="post-form__preview-item">
+                  <div key={i} className="reorder-item">
                     <img src={src} alt={`Preview ${i + 1}`} />
-                    <button
-                      type="button"
-                      className="post-form__preview-remove"
-                      onClick={() => removeImage(i)}
-                      aria-label={`Remove image ${i + 1}`}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                        close
-                      </span>
-                    </button>
+                    <div className="reorder-item__controls">
+                      <button
+                        type="button"
+                        className="reorder-item__btn"
+                        onClick={() => moveImage(i, "left")}
+                        disabled={i === 0}
+                        title="Move Left"
+                      >
+                        <span className="material-symbols-outlined">arrow_back</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="reorder-item__btn"
+                        onClick={() => removeImage(i)}
+                        title="Remove Image"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="reorder-item__btn"
+                        onClick={() => moveImage(i, "right")}
+                        disabled={i === previews.length - 1}
+                        title="Move Right"
+                      >
+                        <span className="material-symbols-outlined">arrow_forward</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

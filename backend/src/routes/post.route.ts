@@ -16,6 +16,14 @@ postRouter.post(
     postController.createPost
 );
 
+// PUT /api/v1/posts/:id — Edit/update a post
+postRouter.put(
+    "/:id",
+    authorizedMiddleware,
+    upload.array("images", 5),
+    postController.editPost
+);
+
 // GET /api/v1/posts?page=1&limit=10 — Fetch paginated feed
 postRouter.get(
     "/",
@@ -28,6 +36,13 @@ postRouter.post(
     "/:id/vote",
     authorizedMiddleware,
     postController.vote
+);
+
+// POST /api/v1/posts/:id/save — Toggle save/unsave a post
+postRouter.post(
+    "/:id/save",
+    authorizedMiddleware,
+    postController.toggleSavePost
 );
 
 // GET /api/v1/posts/:id/comments — Fetch comments

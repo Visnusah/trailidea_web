@@ -15,6 +15,21 @@ export const CreatePostDTO = PostSchema.pick({
 export type CreatePostDTO = z.infer<typeof CreatePostDTO>;
 
 /**
+ * EditPostDTO — validates incoming post edits.
+ * Links and imageOrder are parsed from form fields.
+ */
+export const EditPostDTO = PostSchema.pick({
+    title: true,
+    subtitle: true,
+    description: true,
+    links: true,
+    mapData: true,
+}).partial().extend({
+    imageOrder: z.string().optional(), // JSON array representation of final image URLs & indices
+});
+export type EditPostDTO = z.infer<typeof EditPostDTO>;
+
+/**
  * VoteDTO — validates vote request body.
  * type must be either 'upvote' or 'downvote'.
  */

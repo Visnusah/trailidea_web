@@ -7,6 +7,7 @@ export const PostSchema = z.object({
     imageUrls: z.array(z.string()).optional().default([]),
     links: z.array(z.string().url("Each link must be a valid URL")).optional().default([]),
     mapData: z.any().optional(),
+    isEdited: z.boolean().optional().default(false),
 });
 
 export type PostType = z.infer<typeof PostSchema>;
