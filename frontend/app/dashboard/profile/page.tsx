@@ -403,6 +403,7 @@ const PostDetailModal = ({
   onPostUpdated,
   onVoteToggled,
   onSaveToggled,
+  onDeleteInitiated,
 }: {
   post: PostRecord;
   onClose: () => void;
