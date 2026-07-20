@@ -8,6 +8,8 @@ const userController = new UserController();
 
 userRouter.post("/register", upload.single("profile_pic"), userController.createUser);
 userRouter.post("/login", userController.loginUser);
+userRouter.post("/verify-otp", userController.verifyOTP);
+userRouter.post("/resend-otp", userController.resendOTP);
 
 userRouter.put(
     "/update",
@@ -38,6 +40,18 @@ userRouter.get(
     "/users/profile/:username",
     authorizedMiddleware,
     userController.getPublicProfile
+);
+
+// Followers / Following populated lists
+userRouter.get(
+    "/users/:id/followers",
+    authorizedMiddleware,
+    userController.getFollowers
+);
+userRouter.get(
+    "/users/:id/following",
+    authorizedMiddleware,
+    userController.getFollowing
 );
 
 // Password reset

@@ -55,12 +55,46 @@ export const getPublicProfile = async (username: string): Promise<ProfileRespons
     }
 };
 
-/** GET /api/v1/auth/users/me/saved — Get saved posts */
 export const getSavedPosts = async (): Promise<{ data: PostRecord[] }> => {
     try {
         const response = await axiosInstance.get(API.USERS.SAVED_POSTS);
         return response.data;
     } catch (error: any) {
         throw new Error(error?.response?.data?.message || "Failed to fetch saved posts");
+    }
+};
+
+/** GET /api/v1/auth/users/:id/followers — Get populated followers list */
+export const getFollowers = async (userId: string): Promise<{ data: UserProfile[] }> => {
+    try {
+        const response = await axiosInstance.get(API.USERS.FOLLOWERS(userId));
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error?.response?.data?.message || "Failed to fetch followers");
+    }
+};
+
+/** GET /api/v1/auth/users/:id/following — Get populated following list */
+export const getFollowing = async (userId: string): Promise<{ data: UserProfile[] }> => {
+    try {
+        const response = await axiosInstance.get(API.USERS.FOLLOWING(userId));
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error?.response?.data?.message || "Failed to fetch following");
+    }
+};
+
+/** GET /api/v1/dashboard/sidebar — Get dashboard sidebar data */
+export const getSidebarData = async (): Promise<{
+    data: {
+        trendingPosts: (PostRecord & { upvoteCount: number; engagement: number })[];
+        whoToFollow: (UserProfile & { followerCount: number })[];
+    };
+}> => {
+    try {
+        const response = await axiosInstance.get(API.DASHBOARD.SIDEBAR);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error?.response?.data?.message || "Failed to fetch sidebar data");
     }
 };

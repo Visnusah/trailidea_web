@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PostSchema } from "../types/post.type";
+import { PostSchema, MapDataSchema } from "../types/post.type";
 
 /**
  * CreatePostDTO — validates incoming post creation data.

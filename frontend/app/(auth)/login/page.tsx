@@ -84,6 +84,10 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 403 && data.message.includes("verify your email")) {
+          router.push(`/verify-otp?email=${encodeURIComponent(result.data.email)}`);
+          return;
+        }
         setServerError(data.message || "Login failed");
         setLoading(false);
         return;
@@ -110,7 +114,9 @@ export default function LoginPage() {
         <div className="auth-login-inner animate-fade-in-up">
           {/* ── Brand anchor ── */}
           <div className="brand-center">
-            <h1 className="brand-center__name">Trailidea</h1>
+            <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h1 className="brand-center__name">Trailidea</h1>
+            </Link>
             <p className="brand-center__tagline">
               Welcome back to the wild.
             </p>
@@ -266,7 +272,7 @@ export default function LoginPage() {
                   />
                   <span className="checkbox-label__text">Remember Me</span>
                 </label>
-                <Link href="#" className="text-link">
+                <Link href="/forget-password" className="text-link">
                   Forgot Password?
                 </Link>
               </div>

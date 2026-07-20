@@ -152,3 +152,8 @@ export const updatePost = async (
         throw new Error(error?.response?.data?.message || "Failed to update post");
     }
 };
+
+export const deletePost = async (postId: string) => {
+    const response = await axiosInstance.delete(`/api/v1/posts/${postId}`);
+    return response.data;
+};

@@ -1,64 +1,94 @@
 // app/(auth)/_components/ForgetForm.tsx
 "use client";
-import z from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { handleRequestPasswordReset } from "@/lib/actions/auth-action";
-import { useRouter } from "next/navigation"; // Import useRouter
-import toast from "react-hot-toast";
 
-export const RequestPasswordResetSchema = z.object({
-    email: z.string().email()
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { handleRequestPasswordReset } from "@/lib/actions/auth-action";
+
+const forgotPasswordSchema = z.object({
+    email: z.string().email("Please enter a valid email address."),
 });
 
-export type RequestPasswordResetDTO = z.infer<typeof RequestPasswordResetSchema>;
+type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+
 export default function ForgetForm() {
-    const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RequestPasswordResetDTO>({
-        resolver: zodResolver(RequestPasswordResetSchema)
+    const [isPending, startTransition] = useTransition();
+    const [successMessage, setSuccessMessage] = useState("");
+    const [error, setError] = useState("");
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<ForgotPasswordFormData>({
+        resolver: zodResolver(forgotPasswordSchema),
     });
-    const router = useRouter();
-    const onSubmit = async (data: RequestPasswordResetDTO) => {
-        try{
-            const response = await handleRequestPasswordReset(data.email);
-            if (response.success) {
-                router.push('/login');
-                toast.success('Password reset link sent to your email.');
-            }else{
-                toast.error(response.message || 'Failed to request password reset.');
+
+    const onSubmit = (data: ForgotPasswordFormData) => {
+        setError("");
+        setSuccessMessage("");
+        startTransition(async () => {
+            const result = await handleRequestPasswordReset(data.email);
+            if (result.success) {
+                setSuccessMessage("If an account exists, a password reset link has been sent to your email.");
+            } else {
+                setError(result.message || "Failed to request password reset.");
             }
-        }catch(error){
-            toast.error((error as Error).message || 'Failed to request password reset.');
-        }
-    }
+        });
+    };
+
+    const fieldClass = "h-12 w-full border border-hairline bg-surface-card px-4 text-on-dark placeholder:text-muted outline-none transition-colors focus:border-on-dark";
+    const labelClass = "mb-2 block text-xs font-bold uppercase tracking-[1.5px] text-body";
+    const errClass = "mt-1 block text-sm text-m-red";
+
     return (
-        <div>
-            <h1 className="text-2xl font-bold mb-4">Request Password Reset</h1>
-            <form
-                onSubmit={handleSubmit(onSubmit)}
-                className="max-w-md"
-            >
-                <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1" htmlFor="email">
-                        Email Address
-                    </label>
-                    <input
-                        type="email"
-                        id="email"
-                        {...register("email")}
-                        className="w-full border border-gray-300 p-2 rounded"
-                    />
-                    {errors.email && (
-                        <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-                    )}
+        <div className="w-full max-w-md">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[1.5px] text-muted">Account Recovery</p>
+            <h1 className="mb-4 text-4xl font-bold uppercase leading-none text-on-dark">Forgot Password?</h1>
+            <p className="mb-8 text-sm text-body">
+                Enter your email address and we'll send you a link to reset your password.
+            </p>
+
+            {successMessage ? (
+                <div className="rounded border border-[#35775f] bg-[#e1efe7] px-4 py-6 text-center text-[#2d604e]">
+                    <p className="font-bold">{successMessage}</p>
+                    <Link href="/login" className="mt-4 block font-bold underline hover:no-underline">
+                        Return to Login
+                    </Link>
                 </div>
-                <button
-                    type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    disabled={isSubmitting}
-                >
-                    {isSubmitting ? "Sending..." : "Send Reset Link"}
-                </button>
-            </form>
+            ) : (
+                <form onSubmit={handleSubmit(onSubmit)}>
+                    {error && <div className="mb-6 border border-m-red bg-m-red/10 px-4 py-3 text-sm text-m-red">{error}</div>}
+                    <div className="mb-6">
+                        <label className={labelClass}>Email</label>
+                        <input
+                            type="email"
+                            {...register("email")}
+                            placeholder="you@example.com"
+                            className={fieldClass}
+                        />
+                        {errors.email && <span className={errClass}>{errors.email.message}</span>}
+                    </div>
+                    
+                    <button
+                        type="submit"
+                        disabled={isSubmitting || isPending}
+                        className="mb-6 flex h-12 w-full items-center justify-center bg-on-dark text-xs font-bold uppercase tracking-[1.5px] text-canvas transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                        {isPending ? "Sending link..." : "Send Reset Link"}
+                    </button>
+
+                    <p className="text-center text-sm font-light text-body">
+                        Remembered your password?{" "}
+                        <Link href="/login" className="font-bold text-on-dark underline-offset-4 hover:underline">
+                            Login here
+                        </Link>
+                    </p>
+                </form>
+            )}
         </div>
     );
 }

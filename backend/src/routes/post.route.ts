@@ -59,4 +59,11 @@ postRouter.post(
     postController.addComment
 );
 
+// DELETE /api/v1/posts/:id — Delete a post
+postRouter.delete(
+    "/:id",
+    authorizedMiddleware,
+    postController.deletePost
+);
+
 export default postRouter;

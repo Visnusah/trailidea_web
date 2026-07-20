@@ -44,6 +44,15 @@ export class PostController {
                 links: linksArray,
             };
 
+            // Parse mapData from JSON string (sent via FormData)
+            if (bodyToParse.mapData && typeof bodyToParse.mapData === "string") {
+                try {
+                    bodyToParse.mapData = JSON.parse(bodyToParse.mapData);
+                } catch {
+                    delete bodyToParse.mapData;
+                }
+            }
+
             const parsed = CreatePostDTO.safeParse(bodyToParse);
             if (!parsed.success) {
                 return ApiResponseHelper.error(
@@ -200,6 +209,32 @@ export class PostController {
     }
 
     /**
+     * DELETE /api/v1/posts/:id
+     * Securely delete a post.
+     */
+    async deletePost(req: Request, res: Response) {
+        try {
+            const userId = req.user?._id?.toString();
+            const userRole = req.user?.role;
+            if (!userId || !userRole) {
+                throw new HttpException(401, "Unauthorized");
+            }
+
+            const { id } = req.params;
+
+            await postService.deletePost(id, userId, userRole);
+
+            return ApiResponseHelper.success(res, null, "Post deleted successfully", 200);
+        } catch (error: any) {
+            return ApiResponseHelper.error(
+                res,
+                error.message || "Internal Server Error",
+                error.status || 500
+            );
+        }
+    }
+
+    /**
      * GET /api/v1/posts/:id/comments
      * Fetch all comments for a post
      */
@@ -255,6 +290,15 @@ export class PostController {
                 ...req.body,
                 links: linksArray,
             };
+
+            // Parse mapData from JSON string (sent via FormData)
+            if (bodyToParse.mapData && typeof bodyToParse.mapData === "string") {
+                try {
+                    bodyToParse.mapData = JSON.parse(bodyToParse.mapData);
+                } catch {
+                    delete bodyToParse.mapData;
+                }
+            }
 
             const parsed = EditPostDTO.safeParse(bodyToParse);
             if (!parsed.success) {

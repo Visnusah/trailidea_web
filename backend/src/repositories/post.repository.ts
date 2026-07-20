@@ -1,5 +1,6 @@
 import { PostModel, IPost } from "../models/post.model";
 import { CommentModel } from "../models/comment.model";
+import { UserModel } from "../models/user.model";
 
 export interface IPostRepository {
     create(data: Partial<IPost>): Promise<IPost>;
@@ -7,7 +8,7 @@ export interface IPostRepository {
     getPaginated(page: number, limit: number): Promise<{ posts: any[]; total: number }>;
     addVote(postId: string, userId: string, type: "upvote" | "downvote"): Promise<IPost | null>;
     removeVote(postId: string, userId: string, type: "upvote" | "downvote"): Promise<IPost | null>;
-    delete(id: string): Promise<boolean>;
+    deletePostCascade(id: string): Promise<boolean>;
     update(id: string, data: Partial<IPost>): Promise<IPost | null>;
 }
 
@@ -96,6 +97,23 @@ export class PostMongoRepository implements IPostRepository {
             { $pull: { [field]: userId } },
             { new: true }
         ).populate("author", "firstName lastName username imageUrl");
+    }
+
+    /**
+     * Atomically delete a post and pull it from all users' savedPosts, and delete its comments
+     */
+    async deletePostCascade(id: string): Promise<boolean> {
+        try {
+            await Promise.all([
+                UserModel.updateMany({ savedPosts: id }, { $pull: { savedPosts: id } }),
+                CommentModel.deleteMany({ postId: id }),
+                PostModel.findByIdAndDelete(id)
+            ]);
+            return true;
+        } catch (error) {
+            console.error("Error in deletePostCascade:", error);
+            return false;
+        }
     }
 
     async delete(id: string): Promise<boolean> {

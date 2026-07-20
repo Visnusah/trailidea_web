@@ -13,6 +13,8 @@ export const API = {
         FOLLOW: (id: string) => `/api/v1/auth/users/${id}/follow`,
         PROFILE: (username: string) => `/api/v1/auth/users/profile/${username}`,
         SAVED_POSTS: "/api/v1/auth/users/me/saved",
+        FOLLOWERS: (id: string) => `/api/v1/auth/users/${id}/followers`,
+        FOLLOWING: (id: string) => `/api/v1/auth/users/${id}/following`,
     },
     ADMIN: {
         BLOG: {
@@ -37,5 +39,8 @@ export const API = {
         COMMENTS: (id: string) => `/api/v1/posts/${id}/comments`,
         SAVE: (id: string) => `/api/v1/posts/${id}/save`,
         UPDATE: (id: string): string => `/api/v1/posts/${id}`,
+    },
+    DASHBOARD: {
+        SIDEBAR: "/api/v1/dashboard/sidebar",
     },
 };

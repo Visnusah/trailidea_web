@@ -1,24 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord, toggleSavePost } from "@/lib/api/posts";
+import { useEffect, useState, useRef } from "react";
+import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord, toggleSavePost, deletePost } from "@/lib/api/posts";
 import { useAuth } from "@/app/context/AuthContext";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import MapPreview from "@/app/_components/MapPreview";
+import { getSidebarData, toggleFollow, UserProfile } from "@/lib/api/users";
 
-// Mock Data for Right Sidebar
-const TRENDING_TRAILS = [
-  { name: "Everest Base Camp", saves: "1.2k saves this week", image: "https://images.unsplash.com/photo-1486911278844-a81c5267e227?w=200&q=70" },
-  { name: "Mardi Himal Trek", saves: "842 saves this week", image: "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?w=200&q=70" },
-  { name: "Tilicho Lake Trail", saves: "620 saves this week", image: "https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=200&q=70" },
-];
-
-const TOP_EXPLORERS = [
-  { name: "Ram Bahadur", initials: "RB", trails: 24, distance: "180mi", color: "#173124" },
-  { name: "Sujata Thapa", initials: "ST", trails: 19, distance: "142mi", color: "#725a41" },
-  { name: "Manish Sherpa", initials: "MS", trails: 15, distance: "98mi", color: "#590f00" },
-];
+// Mock Data removed, dynamic state added instead
 
 // Helper to format date
 const formatTimeAgo = (dateString: string) => {
@@ -170,8 +161,15 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   
+  // Sidebar State
+  const [trendingPosts, setTrendingPosts] = useState<(PostRecord & { upvoteCount: number; engagement: number })[]>([]);
+  const [whoToFollow, setWhoToFollow] = useState<(UserProfile & { followerCount: number })[]>([]);
+  
   // Comment Modal state
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [deleteMenuPostId, setDeleteMenuPostId] = useState<string | null>(null);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const fetchFeed = async (pageNum: number, isInitial = false) => {
     try {
@@ -195,6 +193,16 @@ export default function FeedPage() {
 
   useEffect(() => {
     fetchFeed(1, true);
+    
+    // Fetch sidebar data
+    getSidebarData()
+      .then((res) => {
+        setTrendingPosts(res.data.trendingPosts);
+        setWhoToFollow(res.data.whoToFollow);
+      })
+      .catch((err) => {
+        console.error("Failed to load sidebar data", err);
+      });
   }, []);
 
   const handleLoadMore = () => {
@@ -281,6 +289,38 @@ export default function FeedPage() {
     return "";
   };
 
+  const handleFollowToggle = async (userId: string) => {
+    if (!user) {
+      toast.error("Please login to follow");
+      return;
+    }
+    
+    // Optimistic UI update for the sidebar
+    setWhoToFollow(prev => prev.filter(u => u._id !== userId));
+    toast.success("Following user");
+
+    try {
+      await toggleFollow(userId);
+      refreshUser();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to follow");
+      // Could revert optimistic update here, but let's just refetch sidebar in production
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!postToDelete) return;
+    try {
+      await deletePost(postToDelete);
+      toast.success("Post deleted successfully");
+      setPosts(prev => prev.filter(p => p._id !== postToDelete));
+      setPostToDelete(null);
+      setDeleteMenuPostId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete post");
+    }
+  };
+
   return (
     <>
       <div className="feed-grid" style={{ gridTemplateColumns: "1fr 280px" }}>
@@ -348,14 +388,49 @@ export default function FeedPage() {
 
                     {/* Content Area */}
                     <div className="post-card__content">
-                      <div className="post-card__meta">
-                        <img 
-                          src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
-                          alt={post.author.username} 
-                          className="post-card__avatar"
-                        />
-                        <span className="post-card__author">{post.author.firstName} {post.author.lastName}</span>
-                        <span className="post-card__time">• {formatTimeAgo(post.createdAt)}</span>
+                      <div className="post-card__meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Link href={`/dashboard/profile?username=${post.author.username}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+                            <img 
+                              src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
+                              alt={post.author.username} 
+                              className="post-card__avatar"
+                            />
+                            <span className="post-card__author" style={{ color: 'var(--color-on-surface)', fontWeight: 600 }}>{post.author.firstName} {post.author.lastName}</span>
+                          </Link>
+                          <span className="post-card__time">• {formatTimeAgo(post.createdAt)}</span>
+                        </div>
+                        
+                        {(user?._id === post.author._id || user?.role === 'admin') && (
+                          <div style={{ position: "relative" }}>
+                            <button 
+                              onClick={() => setDeleteMenuPostId(post._id === deleteMenuPostId ? null : post._id)}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-on-surface-variant)", display: "flex", alignItems: "center" }}
+                            >
+                              <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                            {deleteMenuPostId === post._id && (
+                              <div style={{ 
+                                position: "absolute", right: 0, top: "100%", zIndex: 10,
+                                background: "var(--color-surface)", border: "1px solid var(--color-outline)",
+                                borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", padding: "4px 0",
+                                minWidth: "120px"
+                              }}>
+                                <button 
+                                  onClick={() => { setPostToDelete(post._id); setDeleteMenuPostId(null); }}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px",
+                                    width: "100%", background: "none", border: "none", cursor: "pointer",
+                                    color: "var(--color-error)", fontSize: "14px"
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <h3 className="text-headline-md post-card__title">{post.title}</h3>
@@ -363,6 +438,15 @@ export default function FeedPage() {
                       
                       {/* Truncated Text using ReadMoreText component */}
                       <ReadMoreText text={post.description} />
+
+                      {post.mapData?.coordinates && (
+                        <div style={{ marginTop: "12px", marginBottom: "12px", height: "200px" }}>
+                          <MapPreview 
+                            coordinates={post.mapData.coordinates} 
+                            placeName={post.mapData.placeName} 
+                          />
+                        </div>
+                      )}
 
                       {post.links && post.links.length > 0 && (
                         <div className="post-card__links">
@@ -467,42 +551,57 @@ export default function FeedPage() {
           {/* Trending Trails */}
           <div className="sidebar-card">
             <h3>Trending Trails</h3>
-            {TRENDING_TRAILS.map((t, i) => (
-              <div key={i} className="trending-item">
-                <img src={t.image} alt={t.name} className="trending-item__img" />
-                <div className="trending-item__info">
-                  <h4>{t.name}</h4>
-                  <p>{t.saves}</p>
+            {trendingPosts.length > 0 ? trendingPosts.map((t) => (
+              <Link href={`/dashboard/post/${t._id}`} key={t._id} style={{ textDecoration: 'none' }}>
+                <div className="trending-item">
+                  {t.imageUrls && t.imageUrls.length > 0 ? (
+                    <img src={`http://localhost:8089${t.imageUrls[0]}`} alt={t.title} className="trending-item__img" />
+                  ) : (
+                    <div className="trending-item__img" style={{ background: "var(--color-surface-container-high)" }}></div>
+                  )}
+                  <div className="trending-item__info">
+                    <h4 className="text-label-md">{t.title}</h4>
+                    <p className="text-body-sm">{t.upvoteCount} upvotes this week</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-            <a className="sidebar-view-all">View All Trending</a>
+              </Link>
+            )) : (
+              <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>No trending posts yet.</p>
+            )}
+            {trendingPosts.length > 0 && <a className="sidebar-view-all">View All Trending</a>}
           </div>
 
           {/* Top Explorers */}
           <div className="sidebar-card">
-            <h3>Top Explorers</h3>
-            {TOP_EXPLORERS.map((e, i) => (
-              <div key={i} className="explorer-item">
-                <div
-                  className="explorer-item__avatar"
-                  style={{ background: e.color }}
-                >
-                  {e.initials}
-                </div>
-                <div className="explorer-item__info">
-                  <div className="explorer-item__name">{e.name}</div>
-                  <div className="explorer-item__stats">
-                    {e.trails} Trails • {e.distance}
+            <h3>Who to Follow</h3>
+            {whoToFollow.length > 0 ? whoToFollow.map((u) => (
+              <div key={u._id} className="explorer-item">
+                <Link href={`/dashboard/profile?username=${u.username}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', flex: 1 }}>
+                  <img
+                    src={u.imageUrl ? `http://localhost:8089${u.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
+                    alt={u.username}
+                    className="explorer-item__avatar"
+                  />
+                  <div className="explorer-item__info">
+                    <span className="explorer-item__name text-label-md" style={{ color: 'var(--color-on-surface)' }}>
+                      {u.firstName} {u.lastName}
+                    </span>
+                    <div className="explorer-item__stats text-body-sm">
+                      {u.followerCount} Followers
+                    </div>
                   </div>
-                </div>
-                <button className="explorer-item__follow" aria-label={`Follow ${e.name}`}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                    person_add
-                  </span>
+                </Link>
+                <button 
+                  className="btn-outline-small" 
+                  onClick={() => handleFollowToggle(u._id)}
+                  style={{ padding: "4px 12px", borderRadius: "100px", fontSize: "13px", fontWeight: "600", borderColor: "var(--color-primary)", color: "var(--color-primary)", flexShrink: 0 }}
+                >
+                  Follow
                 </button>
               </div>
-            ))}
+            )) : (
+              <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>No suggestions right now.</p>
+            )}
           </div>
         </aside>
       </div>
@@ -524,6 +623,45 @@ export default function FeedPage() {
             );
           }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {postToDelete && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "var(--color-surface)", padding: "24px", borderRadius: "16px",
+            maxWidth: "400px", width: "90%", boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
+          }}>
+            <h3 style={{ margin: "0 0 12px 0", color: "var(--color-on-surface)" }}>Delete Post?</h3>
+            <p style={{ margin: "0 0 24px 0", color: "var(--color-on-surface-variant)", fontSize: "14px", lineHeight: "1.5" }}>
+              Are you sure you want to delete this post? This action is permanent and cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button 
+                onClick={() => setPostToDelete(null)}
+                style={{
+                  padding: "8px 16px", border: "1px solid var(--color-outline)", borderRadius: "8px",
+                  background: "transparent", color: "var(--color-on-surface)", cursor: "pointer", fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeletePost}
+                style={{
+                  padding: "8px 16px", border: "none", borderRadius: "8px",
+                  background: "var(--color-error)", color: "var(--color-on-error)", cursor: "pointer", fontWeight: 600
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

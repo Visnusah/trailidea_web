@@ -7,6 +7,7 @@ import { createPostSchema, CreatePostFormData } from "@/lib/validations/post";
 import { createPost } from "@/lib/api/posts";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import MapPicker from "@/app/_components/MapPicker";
 
 export default function CreatePostPage() {
   const router = useRouter();
@@ -15,6 +16,12 @@ export default function CreatePostPage() {
   const [submitting, setSubmitting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Map Integration State
+  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
+  const [coordinates, setCoordinates] = useState<[number, number] | null>(null); // [lng, lat]
+  const [placeName, setPlaceName] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
 
   const {
     register,
@@ -98,6 +105,36 @@ export default function CreatePostPage() {
     handleFileSelect(e.dataTransfer.files);
   };
 
+  const toggleLocation = () => {
+    if (isLocationEnabled) {
+      setIsLocationEnabled(false);
+      setCoordinates(null);
+      setPlaceName("");
+      return;
+    }
+
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          // Leaflet uses [lat, lng], but we store [lng, lat] for GeoJSON
+          setCoordinates([position.coords.longitude, position.coords.latitude]);
+          setIsLocationEnabled(true);
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error(error);
+          toast.error("Could not get your location. Please check browser permissions.");
+          setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      toast.error("Geolocation is not supported by your browser");
+      setIsLocating(false);
+    }
+  };
+
   const onSubmit = async (data: CreatePostFormData) => {
     setSubmitting(true);
     try {
@@ -112,6 +149,16 @@ export default function CreatePostPage() {
         .filter((v) => v && v.trim() !== "");
       if (validLinks.length > 0) {
         formData.append("links", JSON.stringify(validLinks));
+      }
+
+      // Append mapData if location is enabled and we have coordinates
+      if (isLocationEnabled && coordinates) {
+        const mapData = {
+          type: "Point",
+          coordinates: coordinates,
+          placeName: placeName.trim() !== "" ? placeName : undefined,
+        };
+        formData.append("mapData", JSON.stringify(mapData));
       }
 
       // Append image files in their current rearranged order
@@ -305,23 +352,74 @@ export default function CreatePostPage() {
             </button>
           </div>
 
-          {/* Map Placeholder */}
+          {/* Map Integration */}
           <div className="form-group">
-            <label className="form-label">Map Integration Data</label>
-            <div className="post-form__map-placeholder">
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: 36, color: "var(--color-outline)" }}
+            <div className="form-group__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>Location Tag</label>
+              <button 
+                type="button" 
+                onClick={toggleLocation}
+                disabled={isLocating}
+                className="btn-outline-small"
+                style={{
+                  display: "flex", alignItems: "center", gap: "6px",
+                  padding: "6px 12px", borderRadius: "100px",
+                  border: `1px solid ${isLocationEnabled ? "var(--color-primary)" : "var(--color-outline-variant)"}`,
+                  background: isLocationEnabled ? "var(--color-primary-container)" : "transparent",
+                  color: isLocationEnabled ? "var(--color-on-primary-container)" : "var(--color-on-surface)",
+                  cursor: "pointer", fontSize: "13px", fontWeight: "600"
+                }}
               >
-                map
-              </span>
-              <div>
-                <p className="post-form__map-placeholder-title">Coming Soon</p>
-                <p className="post-form__map-placeholder-desc">
-                  Trail GPS tracking, route mapping, and elevation data will be available here in a future update.
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                  {isLocating ? "sync" : (isLocationEnabled ? "location_on" : "location_off")}
+                </span>
+                {isLocating ? "Locating..." : (isLocationEnabled ? "Location Enabled" : "Enable Location")}
+              </button>
+            </div>
+
+            {isLocationEnabled && coordinates ? (
+              <div className="post-form__map-container" style={{ display: "flex", flexDirection: "column", gap: "12px", border: "1px solid var(--color-outline-variant)", borderRadius: "12px", padding: "12px" }}>
+                <input
+                  type="text"
+                  placeholder="Name this place (e.g., Everest Base Camp, Nepal)"
+                  className="post-form__input"
+                  value={placeName}
+                  onChange={(e) => setPlaceName(e.target.value)}
+                />
+                <div style={{ height: "300px", width: "100%", borderRadius: "8px", overflow: "hidden" }}>
+                  <MapPicker 
+                    // Pass as [lat, lng] to MapPicker
+                    position={[coordinates[1], coordinates[0]]} 
+                    onPositionChange={(lat, lng) => {
+                      // MapPicker returns [lat, lng], we store as [lng, lat] for GeoJSON
+                      setCoordinates([lng, lat]);
+                    }} 
+                    onPlaceNameChange={(name) => setPlaceName(name)}
+                  />
+                </div>
+                <p className="post-form__hint" style={{ margin: 0, textAlign: "center" }}>
+                  Click anywhere on the map to move the pin.
                 </p>
               </div>
-            </div>
+            ) : (
+              <div className="post-form__map-placeholder" style={{ 
+                padding: "24px", 
+                border: "1px dashed var(--color-outline-variant)", 
+                borderRadius: "12px", 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "16px",
+                background: "var(--color-surface-container-lowest)"
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 32, color: "var(--color-outline)" }}>map</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: "600", fontSize: "14px", color: "var(--color-on-surface)" }}>Add Location to Post</p>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--color-on-surface-variant)" }}>
+                    Enable location to tag where your trail is located on the map.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit */}

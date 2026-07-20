@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const footerLinks = {
   explore: [
@@ -29,14 +30,19 @@ export default function HomepageFooter() {
         <div className="mb-16 grid grid-cols-1 gap-12 md:grid-cols-4">
           {/* Brand Column */}
           <div className="col-span-1">
-            <div className="mb-6 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#479577]">
-                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
-              </div>
+            <Link href="/" className="mb-6 flex items-center gap-2" aria-label="Trailidea home">
+              <Image
+                src="/logo.png"
+                alt="Trailidea logo"
+                width={40}
+                height={40}
+                style={{
+                  objectFit: "contain",
+                  filter: "brightness(0) invert(1)",
+                }}
+              />
               <span className="text-2xl font-bold text-white">Trailidea</span>
-            </div>
+            </Link>
             <p className="text-sm leading-relaxed text-gray-400">
               Inspiring outdoor exploration and connecting nature lovers
               worldwide, one trail at a time.

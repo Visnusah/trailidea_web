@@ -10,6 +10,9 @@ export interface IUser extends UserType, Document {
     followers: mongoose.Types.ObjectId[];
     following: mongoose.Types.ObjectId[];
     savedPosts: mongoose.Types.ObjectId[];
+    isVerified: boolean;
+    otpCode?: string;
+    otpExpiresAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -28,6 +31,9 @@ const UserMongoSchema: Schema = new Schema<IUser>(
         followers: [{ type: Schema.Types.ObjectId, ref: "User" }],
         following: [{ type: Schema.Types.ObjectId, ref: "User" }],
         savedPosts: [{ type: Schema.Types.ObjectId, ref: "Post" }],
+        isVerified: { type: Boolean, default: false },
+        otpCode: { type: String, required: false },
+        otpExpiresAt: { type: Date, required: false },
     },
     {
         timestamps: true // createdAt and updatedAt will be automatically added and managed by mongoose

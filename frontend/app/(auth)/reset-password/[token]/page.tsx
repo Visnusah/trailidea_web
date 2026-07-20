@@ -1,13 +1,20 @@
-import ForgetForm from "../_components/ForgetForm";
+import ResetPasswordForm from "../../_components/PasswordResetForm";
 import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Forgot Password | Trailidea",
-  description: "Request a password reset link for your Trailidea account.",
+  title: "Reset Password | Trailidea",
+  description: "Set a new password for your Trailidea account.",
 };
 
-export default function ForgotPasswordPage() {
+export default async function Page({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}) {
+    const resolvedParams = await params;
+    const { token } = resolvedParams;
+
     return (
         <div className="auth-root">
           <div className="auth-blob-top" aria-hidden="true" />
@@ -25,7 +32,7 @@ export default function ForgotPasswordPage() {
               </div>
     
               <div className="auth-card animate-fade-in-up animate-delay-100">
-                <ForgetForm />
+                <ResetPasswordForm token={token} />
               </div>
             </div>
           </main>

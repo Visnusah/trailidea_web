@@ -87,36 +87,32 @@ export class UserMongoRepository implements IUserRepository {
     /**
      * Toggle follow: add or remove target from current user's following,
      * and add/remove current user from target's followers.
-     * Uses atomic $addToSet/$pull for thread safety.
+     * Uses atomic $addToSet / $pull — no replica set required.
      */
     async toggleFollow(
         targetUserId: string,
         currentUserId: string
     ): Promise<{ isFollowing: boolean }> {
-        const currentUser = await UserModel.findById(currentUserId);
+        // Check current follow state
+        const currentUser = await UserModel.findById(currentUserId).select("following");
         if (!currentUser) throw new Error("Current user not found");
+
+        const targetUser = await UserModel.findById(targetUserId).select("_id");
+        if (!targetUser) throw new Error("Target user not found");
 
         const isCurrentlyFollowing = currentUser.following.some(
             (id) => id.toString() === targetUserId
         );
 
         if (isCurrentlyFollowing) {
-            // Unfollow
-            await UserModel.findByIdAndUpdate(currentUserId, {
-                $pull: { following: targetUserId },
-            });
-            await UserModel.findByIdAndUpdate(targetUserId, {
-                $pull: { followers: currentUserId },
-            });
+            // Unfollow — atomically remove from both sides
+            await UserModel.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } });
+            await UserModel.findByIdAndUpdate(targetUserId,  { $pull: { followers: currentUserId } });
             return { isFollowing: false };
         } else {
-            // Follow
-            await UserModel.findByIdAndUpdate(currentUserId, {
-                $addToSet: { following: targetUserId },
-            });
-            await UserModel.findByIdAndUpdate(targetUserId, {
-                $addToSet: { followers: currentUserId },
-            });
+            // Follow — atomically add to both sides (no duplicates)
+            await UserModel.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
+            await UserModel.findByIdAndUpdate(targetUserId,  { $addToSet: { followers: currentUserId } });
             return { isFollowing: true };
         }
     }
@@ -204,5 +200,25 @@ export class UserMongoRepository implements IUserRepository {
         );
 
         return { posts: enrichedPosts, total };
+    }
+
+    /**
+     * Get full user objects for a user's followers list.
+     */
+    async getFollowers(userId: string): Promise<Partial<IUser>[]> {
+        const user = await UserModel.findById(userId)
+            .populate("followers", "firstName lastName username imageUrl bio");
+        if (!user) return [];
+        return user.followers as any[];
+    }
+
+    /**
+     * Get full user objects for a user's following list.
+     */
+    async getFollowing(userId: string): Promise<Partial<IUser>[]> {
+        const user = await UserModel.findById(userId)
+            .populate("following", "firstName lastName username imageUrl bio");
+        if (!user) return [];
+        return user.following as any[];
     }
 }

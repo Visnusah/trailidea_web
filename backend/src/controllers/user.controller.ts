@@ -235,4 +235,58 @@ export class UserController {
             return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
         }
     }
+
+    /**
+     * GET /api/v1/auth/users/:id/followers
+     * Returns populated list of followers for a user.
+     */
+    async getFollowers(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const followers = await userRepo.getFollowers(id);
+            return ApiResponseHelper.success(res, followers, "Followers fetched successfully");
+        } catch (e: any) {
+            return ApiResponseHelper.error(res, e?.message || "Failed to fetch followers", e.status || 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/auth/users/:id/following
+     * Returns populated list of users this user follows.
+     */
+    async getFollowing(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const following = await userRepo.getFollowing(id);
+            return ApiResponseHelper.success(res, following, "Following fetched successfully");
+        } catch (e: any) {
+            return ApiResponseHelper.error(res, e?.message || "Failed to fetch following", e.status || 500);
+        }
+    }
+
+    async verifyOTP(req: Request, res: Response) {
+        try {
+            const { email, otpCode } = req.body;
+            if (!email || !otpCode) {
+                throw new HttpException(400, "Email and OTP code are required");
+            }
+            const { user, token } = await userService.verifyOTP(email, otpCode);
+            return ApiResponseHelper.success(res, { user, token }, "Email verified successfully");
+        } catch (error: Error | any) {
+            return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
+        }
+    }
+
+    async resendOTP(req: Request, res: Response) {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                throw new HttpException(400, "Email is required");
+            }
+            const result = await userService.resendOTP(email);
+            return ApiResponseHelper.success(res, result, "OTP resent successfully");
+        } catch (error: Error | any) {
+            return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
+        }
+    }
 }

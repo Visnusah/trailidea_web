@@ -1,94 +1,105 @@
-// app/(auth)/_components/PasswordResetForm.tsx
 "use client";
+
 import { useForm } from "react-hook-form";
-import z from "zod";
+import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { handleResetPassword } from "@/lib/actions/auth-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "react-toastify";
-export const ResetPasswordSchema = z.object({
+import { useState, useTransition } from "react";
+import toast from "react-hot-toast";
+
+const ResetPasswordSchema = z.object({
     password: z.string().min(6, "Password must be at least 6 characters long"),
     confirmPassword: z.string().min(6, "Confirm Password must be at least 6 characters long")
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
+    path: ["confirmPassword"],
 });
 
-export type ResetPasswordDTO = z.infer<typeof ResetPasswordSchema>;
+type ResetPasswordFormData = z.infer<typeof ResetPasswordSchema>;
 
-export default function ResetPasswordForm({
-    token,
-}: {
-    token: string;
-}) {
-    const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ResetPasswordDTO>({
+export default function ResetPasswordForm({ token }: { token: string }) {
+    const [isPending, startTransition] = useTransition();
+    const [error, setError] = useState("");
+    const router = useRouter();
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting }
+    } = useForm<ResetPasswordFormData>({
         resolver: zodResolver(ResetPasswordSchema)
     });
-    const router = useRouter();
-    const onSubmit = async (data: ResetPasswordDTO) => {
-        try {
+
+    const onSubmit = (data: ResetPasswordFormData) => {
+        setError("");
+        startTransition(async () => {
             const response = await handleResetPassword(token, data.password);
             if (response.success) {
-                toast.success("Password reset successfully");
-                // Redirect to login page
+                toast.success("Password reset successfully. You can now log in.");
                 router.replace('/login');
             } else {
-                toast.error(response.message || "Failed to reset password");
+                setError(response.message || "Failed to reset password.");
+                toast.error(response.message || "Failed to reset password.");
             }
-        } catch (error) {
-            // Handle error
-            toast.error("An unexpected error occurred");
-        }
-    }
+        });
+    };
+
+    const fieldClass = "h-12 w-full border border-hairline bg-surface-card px-4 text-on-dark placeholder:text-muted outline-none transition-colors focus:border-on-dark";
+    const labelClass = "mb-2 block text-xs font-bold uppercase tracking-[1.5px] text-body";
+    const errClass = "mt-1 block text-sm text-m-red";
 
     return (
-        <div>
-            <form className="max-w-md" onSubmit={handleSubmit(onSubmit)}>
-                <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1" htmlFor="password">
-                        New Password
-                    </label>
+        <div className="w-full max-w-md">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[1.5px] text-muted">Account Recovery</p>
+            <h1 className="mb-4 text-4xl font-bold uppercase leading-none text-on-dark">New Password</h1>
+            <p className="mb-8 text-sm text-body">
+                Enter your new password below.
+            </p>
+
+            <form onSubmit={handleSubmit(onSubmit)}>
+                {error && <div className="mb-6 border border-m-red bg-m-red/10 px-4 py-3 text-sm text-m-red">{error}</div>}
+                
+                <div className="mb-5">
+                    <label className={labelClass}>New Password</label>
                     <input
                         type="password"
-                        id="password"
                         {...register("password")}
-                        className="w-full border border-gray-300 p-2 rounded"
+                        placeholder="••••••••"
+                        className={fieldClass}
                     />
-                    {errors.password && (
-                        <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
-                    )}
+                    {errors.password && <span className={errClass}>{errors.password.message}</span>}
                 </div>
-                <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1" htmlFor="confirmPassword">
-                        Confirm New Password
-                    </label>
+                
+                <div className="mb-6">
+                    <label className={labelClass}>Confirm New Password</label>
                     <input
                         type="password"
-                        id="confirmPassword"
                         {...register("confirmPassword")}
-                        className="w-full border border-gray-300 p-2 rounded"
+                        placeholder="••••••••"
+                        className={fieldClass}
                     />
-                    {errors.confirmPassword && (
-                        <p className="text-red-500 text-sm mt-1">{errors.confirmPassword.message}</p>
-                    )}
-                </div>
-                <div className="mb-4">
-                    <Link href="/login" className="text-sm text-blue-500 hover:underline mb-4 inline-block">
-                        Back to Login
-                    </Link>
-                    <Link href="/forget-password" className="text-sm text-blue-500 hover:underline mb-4 inline-block ml-4">
-                        Request another reset email
-                    </Link>
+                    {errors.confirmPassword && <span className={errClass}>{errors.confirmPassword.message}</span>}
                 </div>
 
                 <button
                     type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isPending}
+                    className="mb-6 flex h-12 w-full items-center justify-center bg-on-dark text-xs font-bold uppercase tracking-[1.5px] text-canvas transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                    {isSubmitting ? "Resetting..." : "Reset Password"}
+                    {isPending ? "Resetting..." : "Reset Password"}
                 </button>
+
+                <div className="flex flex-col items-center justify-center gap-2 text-sm text-body">
+                    <Link href="/login" className="font-bold text-on-dark underline-offset-4 hover:underline">
+                        Back to Login
+                    </Link>
+                    <Link href="/forget-password" className="text-xs font-bold text-muted underline-offset-4 hover:underline">
+                        Request another reset link
+                    </Link>
+                </div>
             </form>
         </div>
-    )
+    );
 }

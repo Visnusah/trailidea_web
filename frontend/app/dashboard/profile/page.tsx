@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import { getPublicProfile, toggleFollow, getSavedPosts, UserProfile } from "@/lib/api/users";
-import { PostRecord, toggleVote, toggleSavePost, CommentRecord, updatePost } from "@/lib/api/posts";
+import { useSearchParams } from "next/navigation";
+import { getPublicProfile, toggleFollow, getSavedPosts, getFollowers, getFollowing, UserProfile } from "@/lib/api/users";
+import { PostRecord, toggleVote, toggleSavePost, CommentRecord, updatePost, deletePost } from "@/lib/api/posts";
 import { getComments, createComment } from "@/lib/api/posts";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
+import MapPreview from "@/app/_components/MapPreview";
 
 const TABS = ["My Posts", "Saved Posts"];
 
@@ -408,6 +410,7 @@ const PostDetailModal = ({
   onPostUpdated: (updatedPost: PostRecord) => void;
   onVoteToggled: (postId: string, type: "upvote" | "downvote") => void;
   onSaveToggled: (postId: string) => void;
+  onDeleteInitiated?: (postId: string) => void;
 }) => {
   const { user } = useAuth();
   const [showEditModal, setShowEditModal] = useState(false);
@@ -435,14 +438,26 @@ const PostDetailModal = ({
             <h3 className="text-headline-md">{post.title}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {isOwnProfile && (
-                <button
-                  className="profile-settings-btn"
-                  style={{ padding: "6px 12px" }}
-                  onClick={() => setShowEditModal(true)}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
-                  Edit
-                </button>
+                <>
+                  <button
+                    className="profile-settings-btn"
+                    style={{ padding: "6px 12px" }}
+                    onClick={() => setShowEditModal(true)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                    Edit
+                  </button>
+                  <button
+                    className="profile-settings-btn"
+                    style={{ padding: "6px 12px", color: "var(--color-error)", borderColor: "var(--color-error)" }}
+                    onClick={() => {
+                      if (onDeleteInitiated) onDeleteInitiated(post._id);
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                    Delete
+                  </button>
+                </>
               )}
               <button className="post-detail-modal__close" onClick={onClose}>
                 <span className="material-symbols-outlined">close</span>
@@ -476,6 +491,16 @@ const PostDetailModal = ({
             {/* Edited tag indicator */}
             {post.isEdited && (
               <span className="edited-tag">(edited)</span>
+            )}
+
+            {/* Location Tag */}
+            {post.mapData?.coordinates && (
+              <div style={{ marginTop: "12px", marginBottom: "12px", height: "200px" }}>
+                <MapPreview 
+                  coordinates={post.mapData.coordinates} 
+                  placeName={post.mapData.placeName} 
+                />
+              </div>
             )}
 
             {/* Images Carousel list */}
@@ -618,15 +643,30 @@ export default function ProfilePage() {
 
   // Post Detail Modal State
   const [selectedPost, setSelectedPost] = useState<PostRecord | null>(null);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const isOwnProfile = true; // currently only viewing own profile
+  // Followers / Following modal state — REQUIRED by JSX below
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [followersList, setFollowersList] = useState<UserProfile[]>([]);
+  const [followingList, setFollowingList] = useState<UserProfile[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
 
-  // Fetch profile data
+  // Determine which profile to display based on URL parameter
+  const searchParams = useSearchParams();
+  const routeUsername = searchParams?.get('username') || user?.username;
+  const isOwnProfile = routeUsername === user?.username;
+
+  // Fetch profile data — uses routeUsername so other users' profiles load correctly
   const fetchProfile = useCallback(async () => {
-    if (!user?.username) return;
+    if (!routeUsername) return;
     try {
       setLoading(true);
-      const res = await getPublicProfile(user.username);
+      setActiveTab(0); // reset tab when loading a new profile
+      setFollowersList([]);
+      setFollowingList([]);
+      const res = await getPublicProfile(routeUsername);
       setProfileData(res.data.user);
       setProfilePosts(res.data.posts);
       setFollowersCount(res.data.followersCount);
@@ -634,13 +674,15 @@ export default function ProfilePage() {
 
       if (res.data.user.followers && user?._id) {
         setIsFollowing(res.data.user.followers.some((id: string) => id === user._id));
+      } else {
+        setIsFollowing(false);
       }
     } catch (err) {
       console.error("Failed to load profile:", err);
     } finally {
       setLoading(false);
     }
-  }, [user?.username, user?._id]);
+  }, [routeUsername, user?._id]);
 
   useEffect(() => {
     fetchProfile();
@@ -689,10 +731,13 @@ export default function ProfilePage() {
     if (!profileData?._id) return;
     try {
       const res = await toggleFollow(profileData._id);
-      setIsFollowing(res.data.isFollowing);
-      setFollowersCount((prev) => (res.data.isFollowing ? prev + 1 : prev - 1));
-    } catch (err) {
+      const nowFollowing = res.data.isFollowing;
+      setIsFollowing(nowFollowing);
+      setFollowersCount((prev) => (nowFollowing ? prev + 1 : prev - 1));
+      toast.success(nowFollowing ? `Following @${profileData.username}` : `Unfollowed @${profileData.username}`);
+    } catch (err: any) {
       console.error("Failed to toggle follow:", err);
+      toast.error(err.message || "Failed to update follow");
     }
   };
 
@@ -823,6 +868,56 @@ export default function ProfilePage() {
     );
   };
 
+  const handleLogout = () => {
+    // clear local storage and force a hard redirect
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
+
+  const handleDeletePost = async () => {
+    if (!postToDelete) return;
+    try {
+      await deletePost(postToDelete);
+      toast.success("Post deleted successfully");
+      setProfilePosts(prev => prev.filter(p => p._id !== postToDelete));
+      if (selectedPost && selectedPost._id === postToDelete) {
+        setSelectedPost(null);
+      }
+      setPostToDelete(null);
+      
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete post");
+    }
+  };
+
+  const openFollowersModal = async () => {
+    if (!profileData?._id) return;
+    setShowFollowersModal(true);
+    setFollowListLoading(true);
+    try {
+      const res = await getFollowers(profileData._id);
+      setFollowersList(res.data);
+    } catch (err) {
+      console.error("Failed to load followers:", err);
+    } finally {
+      setFollowListLoading(false);
+    }
+  };
+
+  const openFollowingModal = async () => {
+    if (!profileData?._id) return;
+    setShowFollowingModal(true);
+    setFollowListLoading(true);
+    try {
+      const res = await getFollowing(profileData._id);
+      setFollowingList(res.data);
+    } catch (err) {
+      console.error("Failed to load following:", err);
+    } finally {
+      setFollowListLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
@@ -835,34 +930,36 @@ export default function ProfilePage() {
 
   return (
     <>
-      {/* Cover Photo — LinkedIn-style 4:1 aspect ratio */}
-      {coverUrl ? (
-        <div
-          className="profile-cover"
-          style={{
-            backgroundImage: `url(${coverUrl})`,
-            aspectRatio: "4 / 1",
-            maxHeight: 396,
-            height: "auto",
-          }}
-        />
-      ) : (
-        <div
-          className="profile-cover profile-cover--placeholder"
-          style={{
-            background: "linear-gradient(135deg, var(--color-primary-container) 0%, var(--color-secondary-container) 100%)",
-            aspectRatio: "4 / 1",
-            maxHeight: 396,
-            height: "auto",
-          }}
-        />
-      )}
+      <div className="profile-layout-container">
+        <div className="profile-main-content">
+          {/* Cover Photo */}
+          {coverUrl ? (
+            <div
+              className="profile-cover"
+              style={{
+                backgroundImage: `url(${coverUrl})`,
+              }}
+            />
+          ) : (
+            <div
+              className="profile-cover profile-cover--placeholder"
+              style={{
+                background: "linear-gradient(135deg, var(--color-primary-container) 0%, var(--color-secondary-container) 100%)",
+              }}
+            />
+          )}
 
-      {/* Profile Header */}
-      <div className="profile-header" style={{ display: 'flex', gap: '40px', padding: '20px 40px', alignItems: 'flex-start', maxWidth: '1000px', margin: '0 auto', marginTop: coverUrl ? '-40px' : '20px' }}>
-        {/* Avatar */}
-        <div className="profile-avatar-wrap" style={{ flexShrink: 0 }}>
-          <img src={getAvatarUrl()} alt={displayName} className="profile-avatar" style={{ width: '150px', height: '150px', border: '4px solid var(--color-surface-container-lowest)' }} />
+          {/* Profile Header */}
+          <div className="profile-header">
+            {/* Avatar */}
+            { !isOwnProfile && (
+              <button className="follow-btn" onClick={handleFollowToggle} disabled={loading}>
+                {isFollowing ? 'Unfollow' : 'Follow'}
+              </button>
+            ) }
+
+            <div className="profile-avatar-wrap">
+              <img src={getAvatarUrl()} alt={displayName} className="profile-avatar" />
           {isOwnProfile && (
             <button
               className="profile-avatar-upload"
@@ -891,12 +988,9 @@ export default function ProfilePage() {
             <h1 className="profile-header__username" style={{ fontSize: '20px', fontWeight: '400', color: 'var(--color-on-surface)', margin: 0 }}>
               {profileData?.username || user?.username}
             </h1>
+            
             <div className="profile-header__actions">
-              {isOwnProfile ? (
-                <Link href="/dashboard/settings" className="profile-settings-btn" style={{ padding: '6px 16px', borderRadius: '8px', background: 'var(--color-surface-container-high)', color: 'var(--color-on-surface)', fontSize: '14px', fontWeight: '600', textDecoration: 'none', border: 'none' }}>
-                  Edit Profile
-                </Link>
-              ) : (
+              {!isOwnProfile && (
                 <button className="profile-follow-btn" onClick={handleFollowToggle} style={{ padding: '6px 24px', borderRadius: '8px', background: isFollowing ? 'var(--color-surface-container-high)' : 'var(--color-primary)', color: isFollowing ? 'var(--color-on-surface)' : 'var(--color-on-primary)', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer' }}>
                   {isFollowing ? "Following" : "Follow"}
                 </button>
@@ -910,19 +1004,20 @@ export default function ProfilePage() {
               <span style={{ fontWeight: '600', color: 'var(--color-on-surface)' }}>{profilePosts.length}</span>
               <span style={{ color: 'var(--color-on-surface)' }}>posts</span>
             </div>
-            <div className="profile-stat" style={{ flexDirection: 'row', gap: '6px', fontSize: '16px', border: 'none' }}>
-              <span style={{ fontWeight: '600', color: 'var(--color-on-surface)' }}>{followersCount}</span>
+            <div className="profile-stat" style={{ flexDirection: 'row', gap: '6px', fontSize: '16px', border: 'none', cursor: 'pointer' }} onClick={openFollowersModal}>
+              <span style={{ fontWeight: '600', color: 'var(--color-on-surface)' }} className="clickable-count">{followersCount}</span>
               <span style={{ color: 'var(--color-on-surface)' }}>followers</span>
             </div>
-            <div className="profile-stat" style={{ flexDirection: 'row', gap: '6px', fontSize: '16px', border: 'none' }}>
-              <span style={{ fontWeight: '600', color: 'var(--color-on-surface)' }}>{followingCount}</span>
+            <div className="profile-stat" style={{ flexDirection: 'row', gap: '6px', fontSize: '16px', border: 'none', cursor: 'pointer' }} onClick={openFollowingModal}>
+              <span style={{ fontWeight: '600', color: 'var(--color-on-surface)' }} className="clickable-count">{followingCount}</span>
               <span style={{ color: 'var(--color-on-surface)' }}>following</span>
             </div>
           </div>
 
           {/* Bio Section */}
           <div className="profile-bio-section" style={{ fontSize: '14px', color: 'var(--color-on-surface)' }}>
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>{displayName}</div>
+            <div style={{ fontWeight: '600' }}>{displayName}</div>
+            <div style={{ color: 'var(--color-on-surface-variant)', marginBottom: '4px' }}>@{profileData?.username || user?.username}</div>
             <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
               {profileData?.bio || "No bio yet. Add one in settings!"}
             </div>
@@ -942,7 +1037,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Profile Content Grid */}
-      <div className="profile-content" style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 20px' }}>
+      <div className="profile-content">
         {/* ═══ Main Content — Tabs ═══ */}
         <section style={{ borderTop: '1px solid var(--color-outline-variant)' }}>
           <div className="profile-tabs" style={{ display: 'flex', justifyContent: 'center', gap: '40px', borderBottom: 'none', marginBottom: '20px', marginTop: '-1px' }}>
@@ -974,7 +1069,7 @@ export default function ProfilePage() {
                   <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
                     {i === 0 ? 'grid_on' : 'bookmark_border'}
                   </span>
-                  {tab}
+                  {i === 0 && !isOwnProfile ? 'Posts' : tab}
                 </button>
               );
             })}
@@ -1010,17 +1105,204 @@ export default function ProfilePage() {
           </div>
         </section>
       </div>
+      </div> {/* End profile-main-content */}
+
+      {/* Settings Sidebar */}
+      {isOwnProfile && (
+        <aside className="profile-sidebar">
+          <h3 className="text-title-md" style={{ marginBottom: "8px", paddingLeft: "16px" }}>Settings</h3>
+          
+          <Link 
+            href="/dashboard/settings"
+            className="sidebar-nav-item" 
+            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+          >
+            <span className="material-symbols-outlined">edit</span>
+            Edit Bio & Avatar
+          </Link>
+          
+          <button 
+            className={`sidebar-nav-item ${activeTab === 1 ? "active" : ""}`} 
+            onClick={() => setActiveTab(1)}
+          >
+            <span className="material-symbols-outlined">bookmark_border</span>
+            Saved Posts
+          </button>
+
+          <button 
+            className="sidebar-nav-item"
+            onClick={async () => {
+              if (!user?.email) {
+                 toast.error("User email not found");
+                 return;
+              }
+              try {
+                 const { requestPasswordReset } = await import("@/lib/api/auth");
+                 await requestPasswordReset(user.email);
+                 toast.success("Password reset link sent to your email!");
+              } catch (err: any) {
+                 toast.error(err.message || "Failed to send reset link");
+              }
+            }}
+          >
+            <span className="material-symbols-outlined">password</span>
+            Change Password
+          </button>
+
+          <hr style={{ borderColor: 'var(--color-outline-variant)', margin: '16px 0', borderStyle: 'solid', borderBottom: 'none' }} />
+          
+          <button 
+            className="sidebar-nav-item danger" 
+            onClick={() => setShowLogoutConfirm(true)}
+          >
+            <span className="material-symbols-outlined">logout</span>
+            Log Out
+          </button>
+        </aside>
+      )}
+      </div> {/* End profile-layout-container */}
 
       {/* Selected Post Details Modal */}
       {selectedPost && (
         <PostDetailModal
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
-          isOwnProfile={selectedPost.author._id === user?._id}
+          isOwnProfile={isOwnProfile}
           onPostUpdated={handlePostUpdated}
           onVoteToggled={handleVote}
           onSaveToggled={handleSave}
+          onDeleteInitiated={(postId) => setPostToDelete(postId)}
         />
+      )}
+
+      {/* Followers Modal */}
+      {showFollowersModal && (
+        <div className="post-detail-modal__overlay" onClick={() => setShowFollowersModal(false)}>
+          <div className="post-detail-modal modal-content" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+            <div className="post-detail-modal__header">
+              <h2 className="text-title-lg">Followers · {followersCount}</h2>
+              <button className="post-detail-modal__close" onClick={() => setShowFollowersModal(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="post-detail-modal__body" style={{ padding: '8px 0', maxHeight: '60vh', overflowY: 'auto' }}>
+              {followListLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '32px' }}>
+                  <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite', color: 'var(--color-primary)' }}>progress_activity</span>
+                </div>
+              ) : followersList.length > 0 ? (
+                followersList.map((u) => (
+                  <Link
+                    key={u._id}
+                    href={`/dashboard/profile?username=${u.username}`}
+                    onClick={() => setShowFollowersModal(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', textDecoration: 'none', color: 'inherit', borderRadius: '8px', transition: 'background 0.15s' }}
+                    className="follow-modal-row"
+                  >
+                    <img
+                      src={u.imageUrl ? resolveImage(u.imageUrl) : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
+                      alt={u.username}
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-on-surface)' }}>{u.firstName} {u.lastName}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>@{u.username}</div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p style={{ textAlign: 'center', padding: '32px', color: 'var(--color-on-surface-variant)' }}>No followers yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Following Modal */}
+      {showFollowingModal && (
+        <div className="post-detail-modal__overlay" onClick={() => setShowFollowingModal(false)}>
+          <div className="post-detail-modal modal-content" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+            <div className="post-detail-modal__header">
+              <h2 className="text-title-lg">Following · {followingCount}</h2>
+              <button className="post-detail-modal__close" onClick={() => setShowFollowingModal(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="post-detail-modal__body" style={{ padding: '8px 0', maxHeight: '60vh', overflowY: 'auto' }}>
+              {followListLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '32px' }}>
+                  <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite', color: 'var(--color-primary)' }}>progress_activity</span>
+                </div>
+              ) : followingList.length > 0 ? (
+                followingList.map((u) => (
+                  <Link
+                    key={u._id}
+                    href={`/dashboard/profile?username=${u.username}`}
+                    onClick={() => setShowFollowingModal(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', textDecoration: 'none', color: 'inherit', borderRadius: '8px', transition: 'background 0.15s' }}
+                    className="follow-modal-row"
+                  >
+                    <img
+                      src={u.imageUrl ? resolveImage(u.imageUrl) : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
+                      alt={u.username}
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-on-surface)' }}>{u.firstName} {u.lastName}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>@{u.username}</div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p style={{ textAlign: 'center', padding: '32px', color: 'var(--color-on-surface-variant)' }}>Not following anyone yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="post-detail-modal__overlay">
+          <div className="post-detail-modal modal-content" style={{ maxWidth: '400px' }}>
+            <div className="post-detail-modal__header">
+              <h2 className="text-title-lg">Confirm Logout</h2>
+              <button className="post-detail-modal__close" onClick={() => setShowLogoutConfirm(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="post-detail-modal__body text-center" style={{ padding: '32px 24px' }}>
+              <span className="material-symbols-outlined text-error" style={{ fontSize: '48px', marginBottom: '16px' }}>logout</span>
+              <p className="text-body-lg">Are you sure you want to log out of Trailidea?</p>
+              <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '24px' }}>
+                <button className="btn-outline" onClick={() => setShowLogoutConfirm(false)}>Cancel</button>
+                <button className="btn-primary" style={{ background: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={handleLogout}>Log Out</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Post Confirmation Modal */}
+      {postToDelete && (
+        <div className="post-detail-modal__overlay">
+          <div className="post-detail-modal modal-content" style={{ maxWidth: '400px' }}>
+            <div className="post-detail-modal__header">
+              <h2 className="text-title-lg">Delete Post</h2>
+              <button className="post-detail-modal__close" onClick={() => { setPostToDelete(null);  }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="post-detail-modal__body text-center" style={{ padding: '32px 24px' }}>
+              <span className="material-symbols-outlined text-error" style={{ fontSize: '48px', marginBottom: '16px' }}>delete_forever</span>
+              <p className="text-body-lg">Are you sure you want to delete this post? This action cannot be undone.</p>
+              <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '24px' }}>
+                <button className="btn-outline" onClick={() => { setPostToDelete(null);  }}>Cancel</button>
+                <button className="btn-primary" style={{ background: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={handleDeletePost}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
