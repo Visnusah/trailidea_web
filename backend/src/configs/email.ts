@@ -3,7 +3,9 @@ import nodemailer from 'nodemailer';
 import { EMAIL_PASS, EMAIL_USER } from './constant';
 
 export const transporter = nodemailer.createTransport({
-    service: 'gmail', // we are using gmail service to send email
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // true for port 465, prevents Render timeout issues
     auth: {
         user: EMAIL_USER,
         pass: EMAIL_PASS,
