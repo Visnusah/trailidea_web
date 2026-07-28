@@ -9,7 +9,7 @@ export const SECRET_KEY: string = process.env.SECRET_KEY || "trailidea_secret_ke
 
 export const EMAIL_USER: string =
     process.env.EMAIL_USER || "sahk5858@gmail.com";
-export const EMAIL_PASS: string =
-    process.env.EMAIL_PASS || "bokd klkn mjjt ahih";
+export const RESEND_API_KEY: string =
+    process.env.RESEND_API_KEY || "";
 export const CLIENT_URL: string =
     process.env.CLIENT_URL || 'http://localhost:3000';
