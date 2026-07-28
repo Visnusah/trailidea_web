@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord, toggleSavePost, deletePost } from "@/lib/api/posts";
+import { suggestComment } from "@/lib/api/ai";
 import { useAuth } from "@/app/context/AuthContext";
 import toast from "react-hot-toast";
 import Link from "next/link";
@@ -9,14 +10,21 @@ import { formatDistanceToNow } from "date-fns";
 import MapPreview from "@/app/_components/MapPreview";
 import { getSidebarData, toggleFollow, UserProfile } from "@/lib/api/users";
 
-// Mock Data removed, dynamic state added instead
-
 // Helper to format date
 const formatTimeAgo = (dateString: string) => {
   try {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   } catch (e) {
     return "recently";
+  }
+};
+
+// Helper to safely get hostname from a URL string
+const safeHostname = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return url.length > 30 ? url.slice(0, 30) + "…" : url;
   }
 };
 
@@ -31,7 +39,7 @@ const ReadMoreText = ({ text, maxLength = 150 }: { text: string; maxLength?: num
   return (
     <p className="post-card__desc">
       {isExpanded ? text : `${text.slice(0, maxLength)}...`}
-      <button 
+      <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="read-more-btn"
       >
@@ -42,13 +50,15 @@ const ReadMoreText = ({ text, maxLength = 150 }: { text: string; maxLength?: num
 };
 
 // ── Comment Modal Component ──
-const CommentModal = ({ 
-  postId, 
-  onClose, 
-  onCommentAdded 
-}: { 
-  postId: string; 
-  onClose: () => void; 
+const CommentModal = ({
+  postId,
+  postTitle,
+  onClose,
+  onCommentAdded,
+}: {
+  postId: string;
+  postTitle?: string;
+  onClose: () => void;
   onCommentAdded?: (comment: CommentRecord) => void;
 }) => {
   const { user } = useAuth();
@@ -56,20 +66,35 @@ const CommentModal = ({
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [aiChips, setAiChips] = useState<string[]>([]);
+  const [loadingChips, setLoadingChips] = useState(false);
 
   useEffect(() => {
     const fetchComments = async () => {
       try {
         const res = await getComments(postId);
-        setComments(res.data);
-      } catch (error: any) {
+        setComments(Array.isArray(res.data) ? res.data : []);
+      } catch {
         toast.error("Failed to load comments");
       } finally {
         setLoading(false);
       }
     };
     fetchComments();
-  }, [postId]);
+    // Fetch AI comment suggestions when modal opens
+    const fetchChips = async () => {
+      setLoadingChips(true);
+      try {
+        const chips = await suggestComment(postTitle || "trail post");
+        setAiChips(chips);
+      } catch {
+        // Silently skip if AI is unavailable
+      } finally {
+        setLoadingChips(false);
+      }
+    };
+    fetchChips();
+  }, [postId, postTitle]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +107,7 @@ const CommentModal = ({
     setSubmitting(true);
     try {
       const res = await createComment(postId, text);
-      setComments([...comments, res.data]);
+      setComments((prev) => [...prev, res.data]);
       setText("");
       if (onCommentAdded) {
         onCommentAdded(res.data);
@@ -103,7 +128,7 @@ const CommentModal = ({
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        
+
         <div className="comment-modal__body">
           {loading ? (
             <div className="community-feed__loading">
@@ -113,16 +138,22 @@ const CommentModal = ({
             <div className="comment-modal__empty">No comments yet. Be the first!</div>
           ) : (
             <div className="comment-list">
-              {comments.map(comment => (
+              {comments.map((comment) => (
                 <div key={comment._id} className="comment-item">
-                  <img 
-                    src={comment.author.imageUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${comment.author.username}`} 
-                    alt={comment.author.username} 
+                  <img
+                    src={
+                      comment.author?.imageUrl
+                        ? `http://localhost:8089${comment.author.imageUrl}`
+                        : `https://api.dicebear.com/7.x/adventurer/svg?seed=${comment.author?.username || "user"}`
+                    }
+                    alt={comment.author?.username || "user"}
                     className="comment-item__avatar"
                   />
                   <div className="comment-item__content">
                     <div className="comment-item__meta">
-                      <span className="comment-item__author">{comment.author.firstName} {comment.author.lastName}</span>
+                      <span className="comment-item__author">
+                        {comment.author?.firstName || ""} {comment.author?.lastName || ""}
+                      </span>
                       <span className="comment-item__time">{formatTimeAgo(comment.createdAt)}</span>
                     </div>
                     <div className="comment-item__text">{comment.text}</div>
@@ -134,10 +165,34 @@ const CommentModal = ({
         </div>
 
         <div className="comment-modal__footer">
+          {/* AI Quick Reply Chips */}
+          {(aiChips.length > 0 || loadingChips) && (
+            <div className="ai-chips-row">
+              <span className="ai-chips-label">
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                Quick replies
+              </span>
+              {loadingChips ? (
+                <span className="ai-chip ai-chip--loading">...</span>
+              ) : (
+                aiChips.map((chip, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="ai-chip"
+                    onClick={() => setText(chip)}
+                  >
+                    {chip}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="comment-form">
-            <input 
-              type="text" 
-              className="post-form__input" 
+            <input
+              type="text"
+              className="post-form__input"
               placeholder="Add a comment..."
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -160,13 +215,13 @@ export default function FeedPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  
+
   // Sidebar State
   const [trendingPosts, setTrendingPosts] = useState<(PostRecord & { upvoteCount: number; engagement: number })[]>([]);
   const [whoToFollow, setWhoToFollow] = useState<(UserProfile & { followerCount: number })[]>([]);
-  
+
   // Comment Modal state
-  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [activeCommentPost, setActiveCommentPost] = useState<{ id: string; title: string } | null>(null);
   const [deleteMenuPostId, setDeleteMenuPostId] = useState<string | null>(null);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -193,8 +248,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     fetchFeed(1, true);
-    
-    // Fetch sidebar data
+
     getSidebarData()
       .then((res) => {
         setTrendingPosts(res.data.trendingPosts);
@@ -218,46 +272,48 @@ export default function FeedPage() {
       toast.error("Please login to vote");
       return;
     }
-    
-    setPosts(prevPosts => 
-      prevPosts.map(post => {
+
+    setPosts((prevPosts) =>
+      prevPosts.map((post) => {
         if (post._id !== postId) return post;
-        
+
         const userId = user._id;
         const hasUpvoted = post.upvotes.includes(userId);
         const hasDownvoted = post.downvotes.includes(userId);
-        
+
         let newUpvotes = [...post.upvotes];
         let newDownvotes = [...post.downvotes];
-        
+
         if (type === "upvote") {
           if (hasUpvoted) {
-            newUpvotes = newUpvotes.filter(id => id !== userId);
+            newUpvotes = newUpvotes.filter((id) => id !== userId);
           } else {
             newUpvotes.push(userId);
-            newDownvotes = newDownvotes.filter(id => id !== userId);
+            newDownvotes = newDownvotes.filter((id) => id !== userId);
           }
         } else {
           if (hasDownvoted) {
-            newDownvotes = newDownvotes.filter(id => id !== userId);
+            newDownvotes = newDownvotes.filter((id) => id !== userId);
           } else {
             newDownvotes.push(userId);
-            newUpvotes = newUpvotes.filter(id => id !== userId);
+            newUpvotes = newUpvotes.filter((id) => id !== userId);
           }
         }
-        
+
         return { ...post, upvotes: newUpvotes, downvotes: newDownvotes };
       })
     );
 
     try {
       const res = await toggleVote(postId, type);
-      setPosts(prevPosts => prevPosts.map(p => 
-        p._id === postId ? { ...p, upvotes: res.data.post.upvotes, downvotes: res.data.post.downvotes } : p
-      ));
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p._id === postId ? { ...p, upvotes: res.data.post.upvotes, downvotes: res.data.post.downvotes } : p
+        )
+      );
     } catch (error: any) {
       toast.error(error.message || "Failed to vote");
-      fetchFeed(1, true); 
+      fetchFeed(1, true);
     }
   };
 
@@ -277,7 +333,8 @@ export default function FeedPage() {
 
   const handleShare = (postId: string) => {
     const url = `${window.location.origin}/dashboard/post/${postId}`;
-    navigator.clipboard.writeText(url)
+    navigator.clipboard
+      .writeText(url)
       .then(() => toast.success("Link copied to clipboard!"))
       .catch(() => toast.error("Failed to copy link"));
   };
@@ -294,9 +351,8 @@ export default function FeedPage() {
       toast.error("Please login to follow");
       return;
     }
-    
-    // Optimistic UI update for the sidebar
-    setWhoToFollow(prev => prev.filter(u => u._id !== userId));
+
+    setWhoToFollow((prev) => prev.filter((u) => u._id !== userId));
     toast.success("Following user");
 
     try {
@@ -304,7 +360,6 @@ export default function FeedPage() {
       refreshUser();
     } catch (error: any) {
       toast.error(error.message || "Failed to follow");
-      // Could revert optimistic update here, but let's just refetch sidebar in production
     }
   };
 
@@ -313,7 +368,7 @@ export default function FeedPage() {
     try {
       await deletePost(postToDelete);
       toast.success("Post deleted successfully");
-      setPosts(prev => prev.filter(p => p._id !== postToDelete));
+      setPosts((prev) => prev.filter((p) => p._id !== postToDelete));
       setPostToDelete(null);
       setDeleteMenuPostId(null);
     } catch (err: any) {
@@ -372,11 +427,11 @@ export default function FeedPage() {
                       >
                         <span className="material-symbols-outlined">arrow_upward</span>
                       </button>
-                      
+
                       <span className={`post-card__vote-count ${hasUpvoted ? "post-card__vote-count--up" : ""} ${hasDownvoted ? "post-card__vote-count--down" : ""}`}>
                         {netVotes}
                       </span>
-                      
+
                       <button
                         className={`post-card__vote-btn post-card__vote-btn--downvote ${hasDownvoted ? "post-card__vote-btn--active" : ""}`}
                         onClick={() => handleVote(post._id, "downvote")}
@@ -390,33 +445,33 @@ export default function FeedPage() {
                     <div className="post-card__content">
                       <div className="post-card__meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <Link href={`/dashboard/profile?username=${post.author.username}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-                            <img 
-                              src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
-                              alt={post.author.username} 
+                          <Link href={`/dashboard/profile?username=${post.author.username}`} style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
+                            <img
+                              src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`}
+                              alt={post.author.username}
                               className="post-card__avatar"
                             />
-                            <span className="post-card__author" style={{ color: 'var(--color-on-surface)', fontWeight: 600 }}>{post.author.firstName} {post.author.lastName}</span>
+                            <span className="post-card__author" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>{post.author.firstName} {post.author.lastName}</span>
                           </Link>
                           <span className="post-card__time">• {formatTimeAgo(post.createdAt)}</span>
                         </div>
-                        
-                        {(user?._id === post.author._id || user?.role === 'admin') && (
+
+                        {(user?._id === post.author._id || user?.role === "admin") && (
                           <div style={{ position: "relative" }}>
-                            <button 
+                            <button
                               onClick={() => setDeleteMenuPostId(post._id === deleteMenuPostId ? null : post._id)}
                               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-on-surface-variant)", display: "flex", alignItems: "center" }}
                             >
                               <span className="material-symbols-outlined">more_vert</span>
                             </button>
                             {deleteMenuPostId === post._id && (
-                              <div style={{ 
+                              <div style={{
                                 position: "absolute", right: 0, top: "100%", zIndex: 10,
                                 background: "var(--color-surface)", border: "1px solid var(--color-outline)",
                                 borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", padding: "4px 0",
                                 minWidth: "120px"
                               }}>
-                                <button 
+                                <button
                                   onClick={() => { setPostToDelete(post._id); setDeleteMenuPostId(null); }}
                                   style={{
                                     display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px",
@@ -435,25 +490,25 @@ export default function FeedPage() {
 
                       <h3 className="text-headline-md post-card__title">{post.title}</h3>
                       {post.subtitle && <p className="post-card__subtitle">{post.subtitle}</p>}
-                      
-                      {/* Truncated Text using ReadMoreText component */}
+
                       <ReadMoreText text={post.description} />
 
                       {post.mapData?.coordinates && (
                         <div style={{ marginTop: "12px", marginBottom: "12px", height: "200px" }}>
-                          <MapPreview 
-                            coordinates={post.mapData.coordinates} 
-                            placeName={post.mapData.placeName} 
+                          <MapPreview
+                            coordinates={post.mapData.coordinates}
+                            placeName={post.mapData.placeName}
                           />
                         </div>
                       )}
 
+                      {/* Links — safe URL parsing */}
                       {post.links && post.links.length > 0 && (
                         <div className="post-card__links">
                           {post.links.map((link, idx) => (
                             <a key={idx} href={link} target="_blank" rel="noopener noreferrer" className="post-card__link">
                               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>link</span>
-                              {new URL(link).hostname.replace('www.', '')}
+                              {safeHostname(link)}
                             </a>
                           ))}
                         </div>
@@ -477,8 +532,8 @@ export default function FeedPage() {
 
                       {/* Inline Comment Snippet */}
                       {post.latestComment && (
-                        <div 
-                          className="post-card__comment-snippet" 
+                        <div
+                          className="post-card__comment-snippet"
                           style={{
                             display: "flex",
                             alignItems: "flex-start",
@@ -489,12 +544,12 @@ export default function FeedPage() {
                             marginTop: "12px",
                             fontSize: "13px",
                             cursor: "pointer"
-                          }} 
-                          onClick={() => setActiveCommentPostId(post._id)}
+                          }}
+                          onClick={() => setActiveCommentPost({ id: post._id, title: post.title })}
                         >
-                          <img 
-                            src={post.latestComment.author?.imageUrl ? `http://localhost:8089${post.latestComment.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.latestComment.author?.username || "user"}`} 
-                            alt={post.latestComment.author?.username} 
+                          <img
+                            src={post.latestComment.author?.imageUrl ? `http://localhost:8089${post.latestComment.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.latestComment.author?.username || "user"}`}
+                            alt={post.latestComment.author?.username}
                             style={{ width: "20px", height: "20px", borderRadius: "50%", objectFit: "cover" }}
                           />
                           <div>
@@ -510,7 +565,7 @@ export default function FeedPage() {
 
                       {/* Toolbar */}
                       <div className="post-card__toolbar">
-                        <button className="post-card__action" onClick={() => setActiveCommentPostId(post._id)}>
+                        <button className="post-card__action" onClick={() => setActiveCommentPost({ id: post._id, title: post.title })}>
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chat_bubble_outline</span>
                           {post.commentCount || 0} Comments
                         </button>
@@ -518,8 +573,8 @@ export default function FeedPage() {
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>share</span>
                           Share
                         </button>
-                        <button 
-                          className={`post-card__action ${isSaved ? "post-card__action--saved" : ""}`} 
+                        <button
+                          className={`post-card__action ${isSaved ? "post-card__action--saved" : ""}`}
                           onClick={() => handleSave(post._id)}
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
@@ -534,8 +589,8 @@ export default function FeedPage() {
               })}
 
               {page < totalPages && (
-                <button 
-                  className="community-feed__load-more" 
+                <button
+                  className="community-feed__load-more"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
                 >
@@ -552,7 +607,7 @@ export default function FeedPage() {
           <div className="sidebar-card">
             <h3>Trending Trails</h3>
             {trendingPosts.length > 0 ? trendingPosts.map((t) => (
-              <Link href={`/dashboard/post/${t._id}`} key={t._id} style={{ textDecoration: 'none' }}>
+              <Link href={`/dashboard/post/${t._id}`} key={t._id} style={{ textDecoration: "none" }}>
                 <div className="trending-item">
                   {t.imageUrls && t.imageUrls.length > 0 ? (
                     <img src={`http://localhost:8089${t.imageUrls[0]}`} alt={t.title} className="trending-item__img" />
@@ -576,14 +631,14 @@ export default function FeedPage() {
             <h3>Who to Follow</h3>
             {whoToFollow.length > 0 ? whoToFollow.map((u) => (
               <div key={u._id} className="explorer-item">
-                <Link href={`/dashboard/profile?username=${u.username}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', flex: 1 }}>
+                <Link href={`/dashboard/profile?username=${u.username}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", flex: 1 }}>
                   <img
                     src={u.imageUrl ? `http://localhost:8089${u.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
                     alt={u.username}
                     className="explorer-item__avatar"
                   />
                   <div className="explorer-item__info">
-                    <span className="explorer-item__name text-label-md" style={{ color: 'var(--color-on-surface)' }}>
+                    <span className="explorer-item__name text-label-md" style={{ color: "var(--color-on-surface)" }}>
                       {u.firstName} {u.lastName}
                     </span>
                     <div className="explorer-item__stats text-body-sm">
@@ -591,8 +646,8 @@ export default function FeedPage() {
                     </div>
                   </div>
                 </Link>
-                <button 
-                  className="btn-outline-small" 
+                <button
+                  className="btn-outline-small"
                   onClick={() => handleFollowToggle(u._id)}
                   style={{ padding: "4px 12px", borderRadius: "100px", fontSize: "13px", fontWeight: "600", borderColor: "var(--color-primary)", color: "var(--color-primary)", flexShrink: 0 }}
                 >
@@ -606,14 +661,15 @@ export default function FeedPage() {
         </aside>
       </div>
 
-      {activeCommentPostId && (
-        <CommentModal 
-          postId={activeCommentPostId} 
-          onClose={() => setActiveCommentPostId(null)} 
+      {activeCommentPost && (
+        <CommentModal
+          postId={activeCommentPost.id}
+          postTitle={activeCommentPost.title}
+          onClose={() => setActiveCommentPost(null)}
           onCommentAdded={(newComment) => {
             setPosts((prevPosts) =>
               prevPosts.map((post) => {
-                if (post._id !== activeCommentPostId) return post;
+                if (post._id !== activeCommentPost.id) return post;
                 return {
                   ...post,
                   commentCount: (post.commentCount || 0) + 1,
@@ -641,7 +697,7 @@ export default function FeedPage() {
               Are you sure you want to delete this post? This action is permanent and cannot be undone.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button 
+              <button
                 onClick={() => setPostToDelete(null)}
                 style={{
                   padding: "8px 16px", border: "1px solid var(--color-outline)", borderRadius: "8px",
@@ -650,7 +706,7 @@ export default function FeedPage() {
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleDeletePost}
                 style={{
                   padding: "8px 16px", border: "none", borderRadius: "8px",

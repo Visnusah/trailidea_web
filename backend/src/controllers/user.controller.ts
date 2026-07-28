@@ -236,6 +236,32 @@ export class UserController {
         }
     }
 
+    async sendResetPasswordOTP(req: Request, res: Response) {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                throw new HttpException(400, "Email is required");
+            }
+            const result = await userService.sendResetPasswordOTP(email);
+            return ApiResponseHelper.success(res, result, "Reset password OTP sent successfully", 200);
+        } catch (error: Error | any) {
+            return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
+        }
+    }
+
+    async resetPasswordWithOTP(req: Request, res: Response) {
+        try {
+            const { email, otpCode, newPassword } = req.body;
+            if (!email || !otpCode || !newPassword) {
+                throw new HttpException(400, "Email, OTP and new password are required");
+            }
+            const updatedUser = await userService.resetPasswordWithOTP(email, otpCode, newPassword);
+            return ApiResponseHelper.success(res, updatedUser, "Password reset successfully", 200);
+        } catch (error: Error | any) {
+            return ApiResponseHelper.error(res, error.message || "Internal Server Error", error.status || 500);
+        }
+    }
+
     /**
      * GET /api/v1/auth/users/:id/followers
      * Returns populated list of followers for a user.

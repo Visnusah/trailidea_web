@@ -5,7 +5,7 @@ import { HttpException } from "../exceptions/http-exception";
 import bycryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { CLIENT_URL, SECRET_KEY } from "../configs/constant";
-import { sendEmail, sendOTPEmail, sendPasswordResetEmail } from "../configs/email";
+import { sendEmail, sendOTPEmail, sendPasswordResetEmail, sendPasswordResetOTPEmail } from "../configs/email";
 
 const userRepository = new UserMongoRepository();
 
@@ -114,6 +114,50 @@ export class UserService {
         await sendPasswordResetEmail(user.email, resetLink);
         return { user, token };
 
+    }
+
+    async sendResetPasswordOTP(email?: string) {
+        if (!email) {
+            throw new HttpException(400, "Email is required");
+        }
+        const user = await userRepository.getUserByEmail(email);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+        
+        await userRepository.update(user._id.toString(), {
+            otpCode,
+            otpExpiresAt,
+        });
+
+        await sendPasswordResetOTPEmail(user.email, otpCode);
+        return { message: "Reset password OTP sent successfully" };
+    }
+
+    async resetPasswordWithOTP(email?: string, otpCode?: string, newPassword?: string) {
+        if (!email || !otpCode || !newPassword) {
+            throw new HttpException(400, "Email, OTP and new password are required");
+        }
+        const user = await userRepository.getUserByEmail(email);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        if (user.otpCode !== otpCode) {
+            throw new HttpException(400, "Invalid OTP code");
+        }
+        if (user.otpExpiresAt && new Date() > user.otpExpiresAt) {
+            throw new HttpException(400, "OTP code has expired");
+        }
+        const hashedPassword = await bycryptjs.hash(newPassword, 10);
+        await userRepository.update(user._id.toString(), { 
+            password: hashedPassword,
+            otpCode: undefined,
+            otpExpiresAt: undefined,
+        });
+        return user;
     }
 
     async resetPassword(token?: string, newPassword?: string) {

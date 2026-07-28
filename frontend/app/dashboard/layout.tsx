@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
 import DashboardNavbar from "@/app/_components/DashboardNavbar";
+import AIChatbot from "@/app/_components/AIChatbot";
 import Link from "next/link";
 
 export default function DashboardLayout({
@@ -53,6 +54,7 @@ export default function DashboardLayout({
     <div className="dash-layout">
       <DashboardNavbar />
       <main className="dash-main">{children}</main>
+      <AIChatbot />
     </div>
   );
 }

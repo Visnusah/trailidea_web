@@ -65,4 +65,15 @@ userRouter.post(
     userController.resetPassword
 );
 
+// Password reset with OTP (for Mobile)
+userRouter.post(
+    "/request-password-reset-otp",
+    userController.sendResetPasswordOTP
+);
+
+userRouter.post(
+    "/reset-password-otp",
+    userController.resetPasswordWithOTP
+);
+
 export default userRouter;

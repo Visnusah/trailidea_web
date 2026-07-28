@@ -254,6 +254,49 @@ export class PostController {
     }
 
     /**
+     * DELETE /api/v1/posts/:id/comments/:commentId
+     * Securely delete a comment.
+     */
+    async deleteComment(req: Request, res: Response) {
+        try {
+            const userId = req.user?._id?.toString();
+            if (!userId) {
+                throw new HttpException(401, "Unauthorized");
+            }
+
+            const { id: postId, commentId } = req.params;
+
+            const comment = await commentRepo.getById(commentId);
+            if (!comment) {
+                throw new HttpException(404, "Comment not found");
+            }
+
+            const post = await postRepo.getById(postId);
+            if (!post) {
+                throw new HttpException(404, "Post not found");
+            }
+
+            const isCommentAuthor = comment.author.toString() === userId;
+            const isPostOwner = post.author._id.toString() === userId;
+            const isAdmin = req.user?.role === "admin";
+
+            if (!isCommentAuthor && !isPostOwner && !isAdmin) {
+                throw new HttpException(403, "You are not authorized to delete this comment");
+            }
+
+            await commentRepo.delete(commentId);
+
+            return ApiResponseHelper.success(res, null, "Comment deleted successfully", 200);
+        } catch (error: any) {
+            return ApiResponseHelper.error(
+                res,
+                error.message || "Internal Server Error",
+                error.status || 500
+            );
+        }
+    }
+
+    /**
      * PUT /api/v1/posts/:id
      * Edit a post. Supports text and image addition, deletion, and rearrangement.
      */

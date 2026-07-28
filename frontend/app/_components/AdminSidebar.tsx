@@ -7,17 +7,19 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const navItems = [
-    { href: "/admin", label: "Overview", icon: "dashboard" },
-    { href: "/admin/moderation", label: "Moderation", icon: "gavel" },
-    { href: "/admin/users", label: "Users", icon: "group" },
+    { href: "/admin", label: "Overview", icon: "space_dashboard", exact: true },
+    { href: "/admin/analytics", label: "Analytics", icon: "insights" },
+    { href: "/admin/users", label: "Users", icon: "people_outline" },
+    { href: "/admin/posts", label: "Posts", icon: "feed" },
+    { href: "/admin/moderation", label: "Moderation", icon: "policy" },
 ];
 
 export default function AdminSidebar() {
     const pathname = usePathname();
     const { user, logout } = useAuth();
 
-    const isActive = (href: string) => {
-        if (href === "/admin") return pathname === "/admin";
+    const isActive = (href: string, exact?: boolean) => {
+        if (exact) return pathname === href;
         return pathname.startsWith(href);
     };
 
@@ -42,7 +44,7 @@ export default function AdminSidebar() {
                     <Link
                         key={item.href}
                         href={item.href}
-                        className={`admin-sidebar__nav-item ${isActive(item.href) ? "admin-sidebar__nav-item--active" : ""}`}
+                        className={`admin-sidebar__nav-item ${isActive(item.href, item.exact) ? "admin-sidebar__nav-item--active" : ""}`}
                     >
                         <span className="material-symbols-outlined admin-sidebar__nav-icon">
                             {item.icon}

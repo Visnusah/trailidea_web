@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createPostSchema, CreatePostFormData } from "@/lib/validations/post";
 import { createPost } from "@/lib/api/posts";
+import { suggestPostDescription } from "@/lib/api/ai";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import MapPicker from "@/app/_components/MapPicker";
@@ -17,9 +18,14 @@ export default function CreatePostPage() {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // AI description suggestions
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Map Integration State
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
-  const [coordinates, setCoordinates] = useState<[number, number] | null>(null); // [lng, lat]
+  const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
   const [placeName, setPlaceName] = useState("");
   const [isLocating, setIsLocating] = useState(false);
 
@@ -27,6 +33,8 @@ export default function CreatePostPage() {
     register,
     handleSubmit,
     control,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CreatePostFormData>({
     resolver: zodResolver(createPostSchema),
@@ -43,6 +51,32 @@ export default function CreatePostPage() {
     name: "links",
   });
 
+  const watchedTitle = watch("title");
+  const watchedDescription = watch("description");
+
+  // Debounce AI suggestions: fire 800ms after user stops typing in description (min 20 chars)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (watchedDescription && watchedDescription.length >= 20) {
+      debounceRef.current = setTimeout(async () => {
+        setLoadingAI(true);
+        const suggestions = await suggestPostDescription(
+          watchedTitle || "Trail Post",
+          watchedDescription
+        );
+        setAiSuggestions(suggestions);
+        setLoadingAI(false);
+      }, 800);
+    } else {
+      setAiSuggestions([]);
+    }
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [watchedDescription, watchedTitle]);
+
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, 5 - selectedFiles.length);
@@ -56,8 +90,6 @@ export default function CreatePostPage() {
 
     const updatedFiles = [...selectedFiles, ...validFiles].slice(0, 5);
     setSelectedFiles(updatedFiles);
-
-    // Generate previews
     const newPreviews = updatedFiles.map((file) => URL.createObjectURL(file));
     setPreviews(newPreviews);
   };
@@ -117,7 +149,6 @@ export default function CreatePostPage() {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          // Leaflet uses [lat, lng], but we store [lng, lat] for GeoJSON
           setCoordinates([position.coords.longitude, position.coords.latitude]);
           setIsLocationEnabled(true);
           setIsLocating(false);
@@ -143,7 +174,6 @@ export default function CreatePostPage() {
       if (data.subtitle) formData.append("subtitle", data.subtitle);
       formData.append("description", data.description);
 
-      // Filter out empty links and send as JSON string
       const validLinks = (data.links || [])
         .map((l) => l.value)
         .filter((v) => v && v.trim() !== "");
@@ -151,7 +181,6 @@ export default function CreatePostPage() {
         formData.append("links", JSON.stringify(validLinks));
       }
 
-      // Append mapData if location is enabled and we have coordinates
       if (isLocationEnabled && coordinates) {
         const mapData = {
           type: "Point",
@@ -161,7 +190,6 @@ export default function CreatePostPage() {
         formData.append("mapData", JSON.stringify(mapData));
       }
 
-      // Append image files in their current rearranged order
       selectedFiles.forEach((file) => {
         formData.append("images", file);
       });
@@ -221,7 +249,7 @@ export default function CreatePostPage() {
             />
           </div>
 
-          {/* Description */}
+          {/* Description + AI Suggestions */}
           <div className="form-group">
             <label className="form-label" htmlFor="post-description">
               Description <span className="post-form__required">*</span>
@@ -238,6 +266,38 @@ export default function CreatePostPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
                 {errors.description.message}
               </span>
+            )}
+
+            {/* AI Description Suggestions */}
+            {(loadingAI || aiSuggestions.length > 0) && (
+              <div className="ai-suggestions-box">
+                <div className="ai-suggestions-header">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--color-primary)" }}>
+                    auto_awesome
+                  </span>
+                  <span>AI Description Suggestions</span>
+                  {loadingAI && (
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, animation: "spin 1s linear infinite" }}>
+                      progress_activity
+                    </span>
+                  )}
+                </div>
+                {!loadingAI &&
+                  aiSuggestions.map((suggestion, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="ai-suggestion-card"
+                      onClick={() => {
+                        setValue("description", suggestion, { shouldValidate: true });
+                        setAiSuggestions([]);
+                      }}
+                    >
+                      <span className="ai-suggestion-number">{i + 1}</span>
+                      <span className="ai-suggestion-text">{suggestion}</span>
+                    </button>
+                  ))}
+              </div>
             )}
           </div>
 
@@ -275,7 +335,6 @@ export default function CreatePostPage() {
               />
             </div>
 
-            {/* Previews with reordering controls */}
             {previews.length > 0 && (
               <div className="reorder-container">
                 {previews.map((src, i) => (
@@ -323,9 +382,7 @@ export default function CreatePostPage() {
                 <input
                   type="url"
                   placeholder="https://example.com"
-                  className={`post-form__input ${
-                    errors.links?.[index]?.value ? "post-form__input--error" : ""
-                  }`}
+                  className={`post-form__input ${errors.links?.[index]?.value ? "post-form__input--error" : ""}`}
                   {...register(`links.${index}.value`)}
                 />
                 <button
@@ -356,8 +413,8 @@ export default function CreatePostPage() {
           <div className="form-group">
             <div className="form-group__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
               <label className="form-label" style={{ marginBottom: 0 }}>Location Tag</label>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={toggleLocation}
                 disabled={isLocating}
                 className="btn-outline-small"
@@ -387,13 +444,9 @@ export default function CreatePostPage() {
                   onChange={(e) => setPlaceName(e.target.value)}
                 />
                 <div style={{ height: "300px", width: "100%", borderRadius: "8px", overflow: "hidden" }}>
-                  <MapPicker 
-                    // Pass as [lat, lng] to MapPicker
-                    position={[coordinates[1], coordinates[0]]} 
-                    onPositionChange={(lat, lng) => {
-                      // MapPicker returns [lat, lng], we store as [lng, lat] for GeoJSON
-                      setCoordinates([lng, lat]);
-                    }} 
+                  <MapPicker
+                    position={[coordinates[1], coordinates[0]]}
+                    onPositionChange={(lat, lng) => setCoordinates([lng, lat])}
                     onPlaceNameChange={(name) => setPlaceName(name)}
                   />
                 </div>
@@ -402,12 +455,12 @@ export default function CreatePostPage() {
                 </p>
               </div>
             ) : (
-              <div className="post-form__map-placeholder" style={{ 
-                padding: "24px", 
-                border: "1px dashed var(--color-outline-variant)", 
-                borderRadius: "12px", 
-                display: "flex", 
-                alignItems: "center", 
+              <div className="post-form__map-placeholder" style={{
+                padding: "24px",
+                border: "1px dashed var(--color-outline-variant)",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
                 gap: "16px",
                 background: "var(--color-surface-container-lowest)"
               }}>

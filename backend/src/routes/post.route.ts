@@ -59,6 +59,13 @@ postRouter.post(
     postController.addComment
 );
 
+// DELETE /api/v1/posts/:id/comments/:commentId — Delete a comment
+postRouter.delete(
+    "/:id/comments/:commentId",
+    authorizedMiddleware,
+    postController.deleteComment
+);
+
 // DELETE /api/v1/posts/:id — Delete a post
 postRouter.delete(
     "/:id",

@@ -31,6 +31,16 @@ export const API = {
             UPDATE: (id: string): string => `/api/v1/admin/users/${id}`,
             DELETE: (id: string): string => `/api/v1/admin/users/${id}`,
         },
+        ANALYTICS: {
+            OVERVIEW: "/api/v1/admin/analytics/overview",
+            GROWTH: "/api/v1/admin/analytics/growth",
+            ENGAGEMENT: "/api/v1/admin/analytics/engagement",
+            CONTENT: "/api/v1/admin/analytics/content",
+        },
+        POSTS: {
+            GET: "/api/v1/admin/posts",
+            DELETE: (id: string): string => `/api/v1/admin/posts/${id}`,
+        },
     },
     POSTS: {
         CREATE: "/api/v1/posts",

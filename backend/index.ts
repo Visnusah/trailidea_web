@@ -5,8 +5,9 @@ import { connectToMongoDB } from "./src/database/mongodb";
 connectToMongoDB();
 
 app.listen(
-    API_PORT,  // start backend in this PORT
+    API_PORT,
+    "0.0.0.0",
     () => {
-        console.log(`Server: http://localhost:${API_PORT}`); // backtick
+        console.log(`Server running on http://0.0.0.0:${API_PORT}`);
     }
 );

@@ -4,6 +4,7 @@ export interface ICommentRepository {
     create(data: Partial<IComment>): Promise<IComment>;
     getByPostId(postId: string): Promise<IComment[]>;
     delete(id: string): Promise<boolean>;
+    getById(id: string): Promise<IComment | null>;
 }
 
 export class CommentMongoRepository implements ICommentRepository {
@@ -21,5 +22,9 @@ export class CommentMongoRepository implements ICommentRepository {
     async delete(id: string): Promise<boolean> {
         const deleted = await CommentModel.findByIdAndDelete(id);
         return !!deleted;
+    }
+
+    async getById(id: string): Promise<IComment | null> {
+        return CommentModel.findById(id);
     }
 }

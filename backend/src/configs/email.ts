@@ -54,3 +54,18 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) => {
     `;
     await sendEmail(to, subject, html);
 };
+
+export const sendPasswordResetOTPEmail = async (to: string, otpCode: string) => {
+    const subject = "Reset Your Trailidea Password";
+    const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #35775f; text-align: center;">Reset Your Password</h2>
+        <p style="color: #4a5568; font-size: 16px;">Please use the following 6-digit code to reset your password. This code will expire in 5 minutes.</p>
+        <div style="background-color: #f7fafc; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #1a202c;">${otpCode}</span>
+        </div>
+        <p style="color: #718096; font-size: 14px; text-align: center;">If you didn't request a password reset, you can safely ignore this email.</p>
+    </div>
+    `;
+    await sendEmail(to, subject, html);
+};
