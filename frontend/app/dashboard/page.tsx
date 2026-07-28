@@ -143,7 +143,7 @@ const CommentModal = ({
                   <img
                     src={
                       comment.author?.imageUrl
-                        ? `http://localhost:8089${comment.author.imageUrl}`
+                        ? `https://trailidea-web.onrender.com${comment.author.imageUrl}`
                         : `https://api.dicebear.com/7.x/adventurer/svg?seed=${comment.author?.username || "user"}`
                     }
                     alt={comment.author?.username || "user"}
@@ -447,7 +447,7 @@ export default function FeedPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <Link href={`/dashboard/profile?username=${post.author.username}`} style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
                             <img
-                              src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`}
+                              src={post.author.imageUrl ? `https://trailidea-web.onrender.com${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`}
                               alt={post.author.username}
                               className="post-card__avatar"
                             />
@@ -517,11 +517,11 @@ export default function FeedPage() {
                       {post.imageUrls && post.imageUrls.length > 0 && (
                         <div className={`post-card__media ${getMediaGridClass(post.imageUrls.length)}`}>
                           {post.imageUrls.slice(0, 3).map((url, idx) => (
-                            <img key={idx} src={`http://localhost:8089${url}`} alt="Post media" className="post-card__image" />
+                            <img key={idx} src={`https://trailidea-web.onrender.com${url}`} alt="Post media" className="post-card__image" />
                           ))}
                           {post.imageUrls.length > 3 && (
                             <div style={{ position: "relative" }}>
-                              <img src={`http://localhost:8089${post.imageUrls[3]}`} alt="More media" className="post-card__image" style={{ filter: "brightness(0.5)" }} />
+                              <img src={`https://trailidea-web.onrender.com${post.imageUrls[3]}`} alt="More media" className="post-card__image" style={{ filter: "brightness(0.5)" }} />
                               <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", fontSize: "24px", fontWeight: "bold" }}>
                                 +{post.imageUrls.length - 3}
                               </div>
@@ -548,7 +548,7 @@ export default function FeedPage() {
                           onClick={() => setActiveCommentPost({ id: post._id, title: post.title })}
                         >
                           <img
-                            src={post.latestComment.author?.imageUrl ? `http://localhost:8089${post.latestComment.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.latestComment.author?.username || "user"}`}
+                            src={post.latestComment.author?.imageUrl ? `https://trailidea-web.onrender.com${post.latestComment.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.latestComment.author?.username || "user"}`}
                             alt={post.latestComment.author?.username}
                             style={{ width: "20px", height: "20px", borderRadius: "50%", objectFit: "cover" }}
                           />
@@ -610,7 +610,7 @@ export default function FeedPage() {
               <Link href={`/dashboard/post/${t._id}`} key={t._id} style={{ textDecoration: "none" }}>
                 <div className="trending-item">
                   {t.imageUrls && t.imageUrls.length > 0 ? (
-                    <img src={`http://localhost:8089${t.imageUrls[0]}`} alt={t.title} className="trending-item__img" />
+                    <img src={`https://trailidea-web.onrender.com${t.imageUrls[0]}`} alt={t.title} className="trending-item__img" />
                   ) : (
                     <div className="trending-item__img" style={{ background: "var(--color-surface-container-high)" }}></div>
                   )}
@@ -633,7 +633,7 @@ export default function FeedPage() {
               <div key={u._id} className="explorer-item">
                 <Link href={`/dashboard/profile?username=${u.username}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", flex: 1 }}>
                   <img
-                    src={u.imageUrl ? `http://localhost:8089${u.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
+                    src={u.imageUrl ? `https://trailidea-web.onrender.com${u.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
                     alt={u.username}
                     className="explorer-item__avatar"
                   />

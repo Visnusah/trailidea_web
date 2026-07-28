@@ -53,7 +53,7 @@ export default function GlobalMap({ posts }: GlobalMapProps) {
               <div style={{ padding: "4px", minWidth: "200px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                   <img 
-                    src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
+                    src={post.author.imageUrl ? `https://trailidea-web.onrender.com${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
                     alt={post.author.username} 
                     style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover" }}
                   />
