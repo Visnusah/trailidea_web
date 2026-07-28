@@ -70,7 +70,7 @@ export default function AdminUsersPage() {
         }
     }, []);
 
-    useEffect(() => { fetchUsers(page, search); }, [page, fetchUsers]);
+    useEffect(() => { fetchUsers(page, search); }, [page, search, fetchUsers]);
 
     const handleSearchChange = (val: string) => {
         setSearch(val);
