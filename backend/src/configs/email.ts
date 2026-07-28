@@ -1,29 +1,20 @@
 // src/config/email.ts
-import nodemailer from 'nodemailer';
-import { EMAIL_PASS, EMAIL_USER } from './constant';
+import { Resend } from 'resend';
+import { RESEND_API_KEY, EMAIL_USER } from './constant';
 
-export const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // true for port 465, prevents Render timeout issues
-    auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS,
-    },
-});
+const resend = new Resend(RESEND_API_KEY);
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
-    const mailOptions = {
-        from: `Trailidea <${EMAIL_USER}>`, // sender address
-        to, // recipient address
-        subject, // subject of the email
-        html, // html body of the email
-    };
-
     try {
-        await transporter.sendMail(mailOptions);
+        const data = await resend.emails.send({
+            from: 'Trailidea <onboarding@resend.dev>', // You must verify a domain on Resend to use your own email
+            to,
+            subject,
+            html,
+        });
+        console.log('Email sent successfully:', data);
     } catch (error) {
-        console.error('Error sending email:', error);
+        console.error('Error sending email via Resend:', error);
     }
 };
 
