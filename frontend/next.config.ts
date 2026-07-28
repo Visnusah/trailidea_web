@@ -5,11 +5,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/v1/:path*",
-        destination: "http://localhost:8089/api/v1/:path*",
+        destination: "https://trailidea-web.onrender.com/api/v1/:path*",
       },
       {
         source: "/uploads/:path*",
-        destination: "http://localhost:8089/uploads/:path*",
+        destination: "https://trailidea-web.onrender.com/uploads/:path*",
       },
     ];
   },

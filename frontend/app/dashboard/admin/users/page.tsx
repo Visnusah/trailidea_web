@@ -82,7 +82,7 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         fetchUsers(page, search);
-    }, [page, fetchUsers]); // search is handled via debounce below
+    }, [page, search, fetchUsers]);
 
     const handleSearchChange = (val: string) => {
         setSearch(val);

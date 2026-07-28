@@ -74,7 +74,7 @@ export default function LoginPage() {
 
     try {
       // Call actual API
-      const response = await fetch("http://localhost:8089/api/v1/auth/login", {
+      const response = await fetch("https://trailidea-web.onrender.com/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result.data),

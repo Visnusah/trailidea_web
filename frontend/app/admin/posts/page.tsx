@@ -62,7 +62,7 @@ export default function AdminPostsPage() {
 
     useEffect(() => {
         fetchPosts(page, search, filter);
-    }, [page, filter, fetchPosts]);
+    }, [page, search, filter, fetchPosts]);
 
     const handleSearchChange = (val: string) => {
         setSearch(val);
