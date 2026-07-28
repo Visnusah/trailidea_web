@@ -19,7 +19,7 @@ import aiRoutes from "./routes/ai.route";
 const app: Application = express();
 
 const corsOptions = {
-    origin: true, // frontend origin, localhost:3000
+    origin: ["http://localhost:3000", "https://trailidea.vercel.app"], // allowed frontend origins
     credentials: true,
     optionsSuccessStatus: 200
 }
