@@ -7,6 +7,14 @@ import { PostRecord } from "@/lib/api/posts";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
+const getImageUrl = (path: string) => {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  if (path.startsWith("/uploads/")) return `https://trailidea-web.onrender.com${path}`;
+  if (path.startsWith("/")) return `https://trailidea-web.onrender.com${path}`;
+  return `https://trailidea-web.onrender.com/uploads/${path}`;
+};
+
 // Fix default marker icon
 const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -53,7 +61,7 @@ export default function GlobalMap({ posts }: GlobalMapProps) {
               <div style={{ padding: "4px", minWidth: "200px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                   <img 
-                    src={post.author.imageUrl ? `https://trailidea-web.onrender.com${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
+                    src={post.author.imageUrl ? getImageUrl(post.author.imageUrl) : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
                     alt={post.author.username} 
                     style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover" }}
                   />
