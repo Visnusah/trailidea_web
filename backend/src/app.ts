@@ -9,7 +9,11 @@ import path from "path";
 import userRoutes from "./routes/user.route";
 import uploadRoutes from "./routes/upload.route";
 import adminUserRoutes from "./routes/admin.user.route";
+import adminAnalyticsRoutes from "./routes/admin.analytics.route";
+import adminPostsRoutes from "./routes/admin.posts.route";
 import postRoutes from "./routes/post.route";
+import dashboardRoutes from "./routes/dashboard.route";
+import aiRoutes from "./routes/ai.route";
 
 
 const app: Application = express();
@@ -27,7 +31,11 @@ app.use(morgan("combined")); // log all requests
 
 app.use("/api/v1/auth", userRoutes); // user related routes
 app.use("/api/v1/admin/users", adminUserRoutes); // admin user management
+app.use("/api/v1/admin/analytics", adminAnalyticsRoutes); // admin analytics
+app.use("/api/v1/admin/posts", adminPostsRoutes); // admin post management
 app.use("/api/v1/posts", postRoutes); // post & feed routes
+app.use("/api/v1/dashboard", dashboardRoutes); // dashboard sidebar widgets
+app.use("/api/v1/ai", aiRoutes); // DeepSeek AI features
 // Serve static files from the "uploads" directory
 app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

@@ -77,4 +77,26 @@ export class PostService {
             downvoteCount: updatedPost.downvotes.length,
         };
     }
+
+    /**
+     * Delete a post. Validates ownership or admin role.
+     */
+    async deletePost(postId: string, userId: string, userRole: string): Promise<void> {
+        const post = await postRepository.getById(postId);
+        if (!post) {
+            throw new HttpException(404, "Post not found");
+        }
+
+        const isAuthor = post.author && post.author._id.toString() === userId.toString();
+        const isAdmin = userRole === "admin";
+
+        if (!isAuthor && !isAdmin) {
+            throw new HttpException(403, "Forbidden: You don't have permission to delete this post");
+        }
+
+        const deleted = await postRepository.deletePostCascade(postId);
+        if (!deleted) {
+            throw new HttpException(500, "Failed to delete post completely");
+        }
+    }
 }

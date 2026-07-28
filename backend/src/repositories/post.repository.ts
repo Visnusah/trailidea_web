@@ -1,12 +1,15 @@
 import { PostModel, IPost } from "../models/post.model";
+import { CommentModel } from "../models/comment.model";
+import { UserModel } from "../models/user.model";
 
 export interface IPostRepository {
     create(data: Partial<IPost>): Promise<IPost>;
     getById(id: string): Promise<IPost | null>;
-    getPaginated(page: number, limit: number): Promise<{ posts: IPost[]; total: number }>;
+    getPaginated(page: number, limit: number): Promise<{ posts: any[]; total: number }>;
     addVote(postId: string, userId: string, type: "upvote" | "downvote"): Promise<IPost | null>;
     removeVote(postId: string, userId: string, type: "upvote" | "downvote"): Promise<IPost | null>;
-    delete(id: string): Promise<boolean>;
+    deletePostCascade(id: string): Promise<boolean>;
+    update(id: string, data: Partial<IPost>): Promise<IPost | null>;
 }
 
 export class PostMongoRepository implements IPostRepository {
@@ -26,11 +29,12 @@ export class PostMongoRepository implements IPostRepository {
     /**
      * Paginated feed retrieval, sorted by newest first.
      * Populates author with safe fields only (no password).
+     * Enriches each post with commentCount and latestComment.
      */
     async getPaginated(
         page: number,
         limit: number
-    ): Promise<{ posts: IPost[]; total: number }> {
+    ): Promise<{ posts: any[]; total: number }> {
         const skip = (page - 1) * limit;
         const [posts, total] = await Promise.all([
             PostModel.find()
@@ -41,7 +45,19 @@ export class PostMongoRepository implements IPostRepository {
             PostModel.countDocuments(),
         ]);
 
-        return { posts, total };
+        // Enrich each post with commentCount and latestComment
+        const enrichedPosts = await Promise.all(
+            posts.map(async (post) => {
+                const postObj = post.toObject();
+                const commentCount = await CommentModel.countDocuments({ postId: post._id.toString() });
+                const latestComment = await CommentModel.findOne({ postId: post._id.toString() })
+                    .populate("author", "firstName lastName username imageUrl")
+                    .sort({ createdAt: -1 });
+                return { ...postObj, commentCount, latestComment };
+            })
+        );
+
+        return { posts: enrichedPosts, total };
     }
 
     /**
@@ -83,8 +99,32 @@ export class PostMongoRepository implements IPostRepository {
         ).populate("author", "firstName lastName username imageUrl");
     }
 
+    /**
+     * Atomically delete a post and pull it from all users' savedPosts, and delete its comments
+     */
+    async deletePostCascade(id: string): Promise<boolean> {
+        try {
+            await Promise.all([
+                UserModel.updateMany({ savedPosts: id }, { $pull: { savedPosts: id } }),
+                CommentModel.deleteMany({ postId: id }),
+                PostModel.findByIdAndDelete(id)
+            ]);
+            return true;
+        } catch (error) {
+            console.error("Error in deletePostCascade:", error);
+            return false;
+        }
+    }
+
     async delete(id: string): Promise<boolean> {
         const deleted = await PostModel.findByIdAndDelete(id);
         return !!deleted;
+    }
+
+    async update(id: string, data: Partial<IPost>): Promise<IPost | null> {
+        return PostModel.findByIdAndUpdate(id, data, { new: true }).populate(
+            "author",
+            "firstName lastName username imageUrl"
+        );
     }
 }

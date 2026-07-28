@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PostSchema } from "../types/post.type";
+import { PostSchema, MapDataSchema } from "../types/post.type";
 
 /**
  * CreatePostDTO — validates incoming post creation data.
@@ -13,6 +13,21 @@ export const CreatePostDTO = PostSchema.pick({
     mapData: true,
 });
 export type CreatePostDTO = z.infer<typeof CreatePostDTO>;
+
+/**
+ * EditPostDTO — validates incoming post edits.
+ * Links and imageOrder are parsed from form fields.
+ */
+export const EditPostDTO = PostSchema.pick({
+    title: true,
+    subtitle: true,
+    description: true,
+    links: true,
+    mapData: true,
+}).partial().extend({
+    imageOrder: z.string().optional(), // JSON array representation of final image URLs & indices
+});
+export type EditPostDTO = z.infer<typeof EditPostDTO>;
 
 /**
  * VoteDTO — validates vote request body.

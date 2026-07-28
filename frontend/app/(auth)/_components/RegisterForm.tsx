@@ -30,7 +30,7 @@ export default function RegisterForm() {
                 try {
                     const result = await handleRegisterUser(data);
                     if (result.success) {
-                        router.push("/login");
+                        router.push(`/verify-otp?email=${encodeURIComponent(data.email)}`);
                     }else{
                         setError(result.message || 'Registration failed');
                     }

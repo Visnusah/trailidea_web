@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
 import DashboardNavbar from "@/app/_components/DashboardNavbar";
+import AIChatbot from "@/app/_components/AIChatbot";
 import Link from "next/link";
 
 export default function DashboardLayout({
@@ -53,29 +54,7 @@ export default function DashboardLayout({
     <div className="dash-layout">
       <DashboardNavbar />
       <main className="dash-main">{children}</main>
-
-      {/* Dashboard Footer */}
-      <footer className="dash-footer">
-        <div className="dash-footer__inner">
-          <div className="dash-footer__brand">
-            <h3>Trailidea</h3>
-            <p>
-              © {new Date().getFullYear()} Trailidea. Explore responsibly. Built
-              for the modern explorer seeking serenity and adventure.
-            </p>
-          </div>
-          <div className="dash-footer__section">
-            <h4>Community</h4>
-            <Link href="#">Safety Guides</Link>
-            <Link href="#">Contact Us</Link>
-          </div>
-          <div className="dash-footer__section">
-            <h4>Legal</h4>
-            <Link href="#">Privacy Policy</Link>
-            <Link href="#">Terms of Service</Link>
-          </div>
-        </div>
-      </footer>
+      <AIChatbot />
     </div>
   );
 }

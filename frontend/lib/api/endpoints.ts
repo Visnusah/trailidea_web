@@ -9,6 +9,13 @@ export const API = {
         REQUEST_PASSWORD_RESET: "/api/v1/auth/request-password-reset",
         RESET_PASSWORD: (token: string): string => `/api/v1/auth/reset-password/${token}`,
     },
+    USERS: {
+        FOLLOW: (id: string) => `/api/v1/auth/users/${id}/follow`,
+        PROFILE: (username: string) => `/api/v1/auth/users/profile/${username}`,
+        SAVED_POSTS: "/api/v1/auth/users/me/saved",
+        FOLLOWERS: (id: string) => `/api/v1/auth/users/${id}/followers`,
+        FOLLOWING: (id: string) => `/api/v1/auth/users/${id}/following`,
+    },
     ADMIN: {
         BLOG: {
             GET: "/api/v1/admin/blogs",
@@ -24,11 +31,26 @@ export const API = {
             UPDATE: (id: string): string => `/api/v1/admin/users/${id}`,
             DELETE: (id: string): string => `/api/v1/admin/users/${id}`,
         },
+        ANALYTICS: {
+            OVERVIEW: "/api/v1/admin/analytics/overview",
+            GROWTH: "/api/v1/admin/analytics/growth",
+            ENGAGEMENT: "/api/v1/admin/analytics/engagement",
+            CONTENT: "/api/v1/admin/analytics/content",
+        },
+        POSTS: {
+            GET: "/api/v1/admin/posts",
+            DELETE: (id: string): string => `/api/v1/admin/posts/${id}`,
+        },
     },
     POSTS: {
         CREATE: "/api/v1/posts",
         FEED: "/api/v1/posts",
         VOTE: (id: string): string => `/api/v1/posts/${id}/vote`,
         COMMENTS: (id: string) => `/api/v1/posts/${id}/comments`,
+        SAVE: (id: string) => `/api/v1/posts/${id}/save`,
+        UPDATE: (id: string): string => `/api/v1/posts/${id}`,
+    },
+    DASHBOARD: {
+        SIDEBAR: "/api/v1/dashboard/sidebar",
     },
 };

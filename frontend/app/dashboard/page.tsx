@@ -1,24 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord } from "@/lib/api/posts";
+import { useEffect, useState, useRef } from "react";
+import { getFeed, toggleVote, PostRecord, getComments, createComment, CommentRecord, toggleSavePost, deletePost } from "@/lib/api/posts";
+import { suggestComment } from "@/lib/api/ai";
 import { useAuth } from "@/app/context/AuthContext";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-
-// Mock Data for Right Sidebar
-const TRENDING_TRAILS = [
-  { name: "Everest Base Camp", saves: "1.2k saves this week", image: "https://images.unsplash.com/photo-1486911278844-a81c5267e227?w=200&q=70" },
-  { name: "Mardi Himal Trek", saves: "842 saves this week", image: "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?w=200&q=70" },
-  { name: "Tilicho Lake Trail", saves: "620 saves this week", image: "https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=200&q=70" },
-];
-
-const TOP_EXPLORERS = [
-  { name: "Ram Bahadur", initials: "RB", trails: 24, distance: "180mi", color: "#173124" },
-  { name: "Sujata Thapa", initials: "ST", trails: 19, distance: "142mi", color: "#725a41" },
-  { name: "Manish Sherpa", initials: "MS", trails: 15, distance: "98mi", color: "#590f00" },
-];
+import MapPreview from "@/app/_components/MapPreview";
+import { getSidebarData, toggleFollow, UserProfile } from "@/lib/api/users";
 
 // Helper to format date
 const formatTimeAgo = (dateString: string) => {
@@ -26,6 +16,15 @@ const formatTimeAgo = (dateString: string) => {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   } catch (e) {
     return "recently";
+  }
+};
+
+// Helper to safely get hostname from a URL string
+const safeHostname = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return url.length > 30 ? url.slice(0, 30) + "…" : url;
   }
 };
 
@@ -40,7 +39,7 @@ const ReadMoreText = ({ text, maxLength = 150 }: { text: string; maxLength?: num
   return (
     <p className="post-card__desc">
       {isExpanded ? text : `${text.slice(0, maxLength)}...`}
-      <button 
+      <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="read-more-btn"
       >
@@ -51,26 +50,51 @@ const ReadMoreText = ({ text, maxLength = 150 }: { text: string; maxLength?: num
 };
 
 // ── Comment Modal Component ──
-const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void }) => {
+const CommentModal = ({
+  postId,
+  postTitle,
+  onClose,
+  onCommentAdded,
+}: {
+  postId: string;
+  postTitle?: string;
+  onClose: () => void;
+  onCommentAdded?: (comment: CommentRecord) => void;
+}) => {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [aiChips, setAiChips] = useState<string[]>([]);
+  const [loadingChips, setLoadingChips] = useState(false);
 
   useEffect(() => {
     const fetchComments = async () => {
       try {
         const res = await getComments(postId);
-        setComments(res.data);
-      } catch (error: any) {
+        setComments(Array.isArray(res.data) ? res.data : []);
+      } catch {
         toast.error("Failed to load comments");
       } finally {
         setLoading(false);
       }
     };
     fetchComments();
-  }, [postId]);
+    // Fetch AI comment suggestions when modal opens
+    const fetchChips = async () => {
+      setLoadingChips(true);
+      try {
+        const chips = await suggestComment(postTitle || "trail post");
+        setAiChips(chips);
+      } catch {
+        // Silently skip if AI is unavailable
+      } finally {
+        setLoadingChips(false);
+      }
+    };
+    fetchChips();
+  }, [postId, postTitle]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,8 +107,11 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
     setSubmitting(true);
     try {
       const res = await createComment(postId, text);
-      setComments([...comments, res.data]);
+      setComments((prev) => [...prev, res.data]);
       setText("");
+      if (onCommentAdded) {
+        onCommentAdded(res.data);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to add comment");
     } finally {
@@ -101,7 +128,7 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        
+
         <div className="comment-modal__body">
           {loading ? (
             <div className="community-feed__loading">
@@ -111,16 +138,22 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
             <div className="comment-modal__empty">No comments yet. Be the first!</div>
           ) : (
             <div className="comment-list">
-              {comments.map(comment => (
+              {comments.map((comment) => (
                 <div key={comment._id} className="comment-item">
-                  <img 
-                    src={comment.author.imageUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${comment.author.username}`} 
-                    alt={comment.author.username} 
+                  <img
+                    src={
+                      comment.author?.imageUrl
+                        ? `http://localhost:8089${comment.author.imageUrl}`
+                        : `https://api.dicebear.com/7.x/adventurer/svg?seed=${comment.author?.username || "user"}`
+                    }
+                    alt={comment.author?.username || "user"}
                     className="comment-item__avatar"
                   />
                   <div className="comment-item__content">
                     <div className="comment-item__meta">
-                      <span className="comment-item__author">{comment.author.firstName} {comment.author.lastName}</span>
+                      <span className="comment-item__author">
+                        {comment.author?.firstName || ""} {comment.author?.lastName || ""}
+                      </span>
                       <span className="comment-item__time">{formatTimeAgo(comment.createdAt)}</span>
                     </div>
                     <div className="comment-item__text">{comment.text}</div>
@@ -132,10 +165,34 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
         </div>
 
         <div className="comment-modal__footer">
+          {/* AI Quick Reply Chips */}
+          {(aiChips.length > 0 || loadingChips) && (
+            <div className="ai-chips-row">
+              <span className="ai-chips-label">
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                Quick replies
+              </span>
+              {loadingChips ? (
+                <span className="ai-chip ai-chip--loading">...</span>
+              ) : (
+                aiChips.map((chip, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="ai-chip"
+                    onClick={() => setText(chip)}
+                  >
+                    {chip}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="comment-form">
-            <input 
-              type="text" 
-              className="post-form__input" 
+            <input
+              type="text"
+              className="post-form__input"
               placeholder="Add a comment..."
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -152,15 +209,22 @@ const CommentModal = ({ postId, onClose }: { postId: string; onClose: () => void
 };
 
 export default function FeedPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  
+
+  // Sidebar State
+  const [trendingPosts, setTrendingPosts] = useState<(PostRecord & { upvoteCount: number; engagement: number })[]>([]);
+  const [whoToFollow, setWhoToFollow] = useState<(UserProfile & { followerCount: number })[]>([]);
+
   // Comment Modal state
-  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [activeCommentPost, setActiveCommentPost] = useState<{ id: string; title: string } | null>(null);
+  const [deleteMenuPostId, setDeleteMenuPostId] = useState<string | null>(null);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const fetchFeed = async (pageNum: number, isInitial = false) => {
     try {
@@ -184,6 +248,15 @@ export default function FeedPage() {
 
   useEffect(() => {
     fetchFeed(1, true);
+
+    getSidebarData()
+      .then((res) => {
+        setTrendingPosts(res.data.trendingPosts);
+        setWhoToFollow(res.data.whoToFollow);
+      })
+      .catch((err) => {
+        console.error("Failed to load sidebar data", err);
+      });
   }, []);
 
   const handleLoadMore = () => {
@@ -199,52 +272,69 @@ export default function FeedPage() {
       toast.error("Please login to vote");
       return;
     }
-    
-    setPosts(prevPosts => 
-      prevPosts.map(post => {
+
+    setPosts((prevPosts) =>
+      prevPosts.map((post) => {
         if (post._id !== postId) return post;
-        
+
         const userId = user._id;
         const hasUpvoted = post.upvotes.includes(userId);
         const hasDownvoted = post.downvotes.includes(userId);
-        
+
         let newUpvotes = [...post.upvotes];
         let newDownvotes = [...post.downvotes];
-        
+
         if (type === "upvote") {
           if (hasUpvoted) {
-            newUpvotes = newUpvotes.filter(id => id !== userId);
+            newUpvotes = newUpvotes.filter((id) => id !== userId);
           } else {
             newUpvotes.push(userId);
-            newDownvotes = newDownvotes.filter(id => id !== userId);
+            newDownvotes = newDownvotes.filter((id) => id !== userId);
           }
         } else {
           if (hasDownvoted) {
-            newDownvotes = newDownvotes.filter(id => id !== userId);
+            newDownvotes = newDownvotes.filter((id) => id !== userId);
           } else {
             newDownvotes.push(userId);
-            newUpvotes = newUpvotes.filter(id => id !== userId);
+            newUpvotes = newUpvotes.filter((id) => id !== userId);
           }
         }
-        
+
         return { ...post, upvotes: newUpvotes, downvotes: newDownvotes };
       })
     );
 
     try {
       const res = await toggleVote(postId, type);
-      setPosts(prevPosts => prevPosts.map(p => 
-        p._id === postId ? { ...p, upvotes: res.data.post.upvotes, downvotes: res.data.post.downvotes } : p
-      ));
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p._id === postId ? { ...p, upvotes: res.data.post.upvotes, downvotes: res.data.post.downvotes } : p
+        )
+      );
     } catch (error: any) {
       toast.error(error.message || "Failed to vote");
-      fetchFeed(1, true); 
+      fetchFeed(1, true);
+    }
+  };
+
+  const handleSave = async (postId: string) => {
+    if (!user) {
+      toast.error("Please login to save posts");
+      return;
+    }
+    try {
+      const res = await toggleSavePost(postId);
+      toast.success(res.data.isSaved ? "Post saved successfully" : "Post unsaved successfully");
+      await refreshUser();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save post");
     }
   };
 
   const handleShare = (postId: string) => {
     const url = `${window.location.origin}/dashboard/post/${postId}`;
-    navigator.clipboard.writeText(url)
+    navigator.clipboard
+      .writeText(url)
       .then(() => toast.success("Link copied to clipboard!"))
       .catch(() => toast.error("Failed to copy link"));
   };
@@ -254,6 +344,36 @@ export default function FeedPage() {
     if (count === 2) return "post-card__media-grid post-card__media-grid--2";
     if (count >= 3) return "post-card__media-grid post-card__media-grid--3";
     return "";
+  };
+
+  const handleFollowToggle = async (userId: string) => {
+    if (!user) {
+      toast.error("Please login to follow");
+      return;
+    }
+
+    setWhoToFollow((prev) => prev.filter((u) => u._id !== userId));
+    toast.success("Following user");
+
+    try {
+      await toggleFollow(userId);
+      refreshUser();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to follow");
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!postToDelete) return;
+    try {
+      await deletePost(postToDelete);
+      toast.success("Post deleted successfully");
+      setPosts((prev) => prev.filter((p) => p._id !== postToDelete));
+      setPostToDelete(null);
+      setDeleteMenuPostId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete post");
+    }
   };
 
   return (
@@ -291,6 +411,11 @@ export default function FeedPage() {
                 const hasUpvoted = user ? post.upvotes.includes(user._id) : false;
                 const hasDownvoted = user ? post.downvotes.includes(user._id) : false;
 
+                const isSaved = user?.savedPosts?.some((id: any) => {
+                  const targetId = typeof id === "string" ? id : id?._id?.toString() || id?.toString();
+                  return targetId === post._id;
+                });
+
                 return (
                   <article key={post._id} className="post-card">
                     {/* Voting Panel */}
@@ -302,11 +427,11 @@ export default function FeedPage() {
                       >
                         <span className="material-symbols-outlined">arrow_upward</span>
                       </button>
-                      
+
                       <span className={`post-card__vote-count ${hasUpvoted ? "post-card__vote-count--up" : ""} ${hasDownvoted ? "post-card__vote-count--down" : ""}`}>
                         {netVotes}
                       </span>
-                      
+
                       <button
                         className={`post-card__vote-btn post-card__vote-btn--downvote ${hasDownvoted ? "post-card__vote-btn--active" : ""}`}
                         onClick={() => handleVote(post._id, "downvote")}
@@ -318,28 +443,72 @@ export default function FeedPage() {
 
                     {/* Content Area */}
                     <div className="post-card__content">
-                      <div className="post-card__meta">
-                        <img 
-                          src={post.author.imageUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`} 
-                          alt={post.author.username} 
-                          className="post-card__avatar"
-                        />
-                        <span className="post-card__author">{post.author.firstName} {post.author.lastName}</span>
-                        <span className="post-card__time">• {formatTimeAgo(post.createdAt)}</span>
+                      <div className="post-card__meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Link href={`/dashboard/profile?username=${post.author.username}`} style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
+                            <img
+                              src={post.author.imageUrl ? `http://localhost:8089${post.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author.username}`}
+                              alt={post.author.username}
+                              className="post-card__avatar"
+                            />
+                            <span className="post-card__author" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>{post.author.firstName} {post.author.lastName}</span>
+                          </Link>
+                          <span className="post-card__time">• {formatTimeAgo(post.createdAt)}</span>
+                        </div>
+
+                        {(user?._id === post.author._id || user?.role === "admin") && (
+                          <div style={{ position: "relative" }}>
+                            <button
+                              onClick={() => setDeleteMenuPostId(post._id === deleteMenuPostId ? null : post._id)}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-on-surface-variant)", display: "flex", alignItems: "center" }}
+                            >
+                              <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                            {deleteMenuPostId === post._id && (
+                              <div style={{
+                                position: "absolute", right: 0, top: "100%", zIndex: 10,
+                                background: "var(--color-surface)", border: "1px solid var(--color-outline)",
+                                borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", padding: "4px 0",
+                                minWidth: "120px"
+                              }}>
+                                <button
+                                  onClick={() => { setPostToDelete(post._id); setDeleteMenuPostId(null); }}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px",
+                                    width: "100%", background: "none", border: "none", cursor: "pointer",
+                                    color: "var(--color-error)", fontSize: "14px"
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <h3 className="text-headline-md post-card__title">{post.title}</h3>
                       {post.subtitle && <p className="post-card__subtitle">{post.subtitle}</p>}
-                      
-                      {/* Truncated Text using ReadMoreText component */}
+
                       <ReadMoreText text={post.description} />
 
+                      {post.mapData?.coordinates && (
+                        <div style={{ marginTop: "12px", marginBottom: "12px", height: "200px" }}>
+                          <MapPreview
+                            coordinates={post.mapData.coordinates}
+                            placeName={post.mapData.placeName}
+                          />
+                        </div>
+                      )}
+
+                      {/* Links — safe URL parsing */}
                       {post.links && post.links.length > 0 && (
                         <div className="post-card__links">
                           {post.links.map((link, idx) => (
                             <a key={idx} href={link} target="_blank" rel="noopener noreferrer" className="post-card__link">
                               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>link</span>
-                              {new URL(link).hostname.replace('www.', '')}
+                              {safeHostname(link)}
                             </a>
                           ))}
                         </div>
@@ -361,15 +530,57 @@ export default function FeedPage() {
                         </div>
                       )}
 
+                      {/* Inline Comment Snippet */}
+                      {post.latestComment && (
+                        <div
+                          className="post-card__comment-snippet"
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "8px",
+                            background: "var(--color-surface-container-low)",
+                            padding: "10px 12px",
+                            borderRadius: "var(--radius-md)",
+                            marginTop: "12px",
+                            fontSize: "13px",
+                            cursor: "pointer"
+                          }}
+                          onClick={() => setActiveCommentPost({ id: post._id, title: post.title })}
+                        >
+                          <img
+                            src={post.latestComment.author?.imageUrl ? `http://localhost:8089${post.latestComment.author.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.latestComment.author?.username || "user"}`}
+                            alt={post.latestComment.author?.username}
+                            style={{ width: "20px", height: "20px", borderRadius: "50%", objectFit: "cover" }}
+                          />
+                          <div>
+                            <span style={{ fontWeight: "700", marginRight: "6px", color: "var(--color-on-surface)" }}>
+                              {post.latestComment.author?.username || "explorer"}:
+                            </span>
+                            <span style={{ color: "var(--color-on-surface-variant)" }}>
+                              {post.latestComment.text}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Toolbar */}
                       <div className="post-card__toolbar">
-                        <button className="post-card__action" onClick={() => setActiveCommentPostId(post._id)}>
+                        <button className="post-card__action" onClick={() => setActiveCommentPost({ id: post._id, title: post.title })}>
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chat_bubble_outline</span>
-                          Comment
+                          {post.commentCount || 0} Comments
                         </button>
                         <button className="post-card__action" onClick={() => handleShare(post._id)}>
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>share</span>
                           Share
+                        </button>
+                        <button
+                          className={`post-card__action ${isSaved ? "post-card__action--saved" : ""}`}
+                          onClick={() => handleSave(post._id)}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            {isSaved ? "bookmark" : "bookmark_border"}
+                          </span>
+                          {isSaved ? "Saved" : "Save"}
                         </button>
                       </div>
                     </div>
@@ -378,8 +589,8 @@ export default function FeedPage() {
               })}
 
               {page < totalPages && (
-                <button 
-                  className="community-feed__load-more" 
+                <button
+                  className="community-feed__load-more"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
                 >
@@ -395,51 +606,118 @@ export default function FeedPage() {
           {/* Trending Trails */}
           <div className="sidebar-card">
             <h3>Trending Trails</h3>
-            {TRENDING_TRAILS.map((t, i) => (
-              <div key={i} className="trending-item">
-                <img src={t.image} alt={t.name} className="trending-item__img" />
-                <div className="trending-item__info">
-                  <h4>{t.name}</h4>
-                  <p>{t.saves}</p>
+            {trendingPosts.length > 0 ? trendingPosts.map((t) => (
+              <Link href={`/dashboard/post/${t._id}`} key={t._id} style={{ textDecoration: "none" }}>
+                <div className="trending-item">
+                  {t.imageUrls && t.imageUrls.length > 0 ? (
+                    <img src={`http://localhost:8089${t.imageUrls[0]}`} alt={t.title} className="trending-item__img" />
+                  ) : (
+                    <div className="trending-item__img" style={{ background: "var(--color-surface-container-high)" }}></div>
+                  )}
+                  <div className="trending-item__info">
+                    <h4 className="text-label-md">{t.title}</h4>
+                    <p className="text-body-sm">{t.upvoteCount} upvotes this week</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-            <a className="sidebar-view-all">View All Trending</a>
+              </Link>
+            )) : (
+              <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>No trending posts yet.</p>
+            )}
+            {trendingPosts.length > 0 && <a className="sidebar-view-all">View All Trending</a>}
           </div>
 
           {/* Top Explorers */}
           <div className="sidebar-card">
-            <h3>Top Explorers</h3>
-            {TOP_EXPLORERS.map((e, i) => (
-              <div key={i} className="explorer-item">
-                <div
-                  className="explorer-item__avatar"
-                  style={{ background: e.color }}
-                >
-                  {e.initials}
-                </div>
-                <div className="explorer-item__info">
-                  <div className="explorer-item__name">{e.name}</div>
-                  <div className="explorer-item__stats">
-                    {e.trails} Trails • {e.distance}
+            <h3>Who to Follow</h3>
+            {whoToFollow.length > 0 ? whoToFollow.map((u) => (
+              <div key={u._id} className="explorer-item">
+                <Link href={`/dashboard/profile?username=${u.username}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", flex: 1 }}>
+                  <img
+                    src={u.imageUrl ? `http://localhost:8089${u.imageUrl}` : `https://api.dicebear.com/7.x/adventurer/svg?seed=${u.username}`}
+                    alt={u.username}
+                    className="explorer-item__avatar"
+                  />
+                  <div className="explorer-item__info">
+                    <span className="explorer-item__name text-label-md" style={{ color: "var(--color-on-surface)" }}>
+                      {u.firstName} {u.lastName}
+                    </span>
+                    <div className="explorer-item__stats text-body-sm">
+                      {u.followerCount} Followers
+                    </div>
                   </div>
-                </div>
-                <button className="explorer-item__follow" aria-label={`Follow ${e.name}`}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                    person_add
-                  </span>
+                </Link>
+                <button
+                  className="btn-outline-small"
+                  onClick={() => handleFollowToggle(u._id)}
+                  style={{ padding: "4px 12px", borderRadius: "100px", fontSize: "13px", fontWeight: "600", borderColor: "var(--color-primary)", color: "var(--color-primary)", flexShrink: 0 }}
+                >
+                  Follow
                 </button>
               </div>
-            ))}
+            )) : (
+              <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>No suggestions right now.</p>
+            )}
           </div>
         </aside>
       </div>
 
-      {activeCommentPostId && (
-        <CommentModal 
-          postId={activeCommentPostId} 
-          onClose={() => setActiveCommentPostId(null)} 
+      {activeCommentPost && (
+        <CommentModal
+          postId={activeCommentPost.id}
+          postTitle={activeCommentPost.title}
+          onClose={() => setActiveCommentPost(null)}
+          onCommentAdded={(newComment) => {
+            setPosts((prevPosts) =>
+              prevPosts.map((post) => {
+                if (post._id !== activeCommentPost.id) return post;
+                return {
+                  ...post,
+                  commentCount: (post.commentCount || 0) + 1,
+                  latestComment: newComment,
+                };
+              })
+            );
+          }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {postToDelete && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "var(--color-surface)", padding: "24px", borderRadius: "16px",
+            maxWidth: "400px", width: "90%", boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
+          }}>
+            <h3 style={{ margin: "0 0 12px 0", color: "var(--color-on-surface)" }}>Delete Post?</h3>
+            <p style={{ margin: "0 0 24px 0", color: "var(--color-on-surface-variant)", fontSize: "14px", lineHeight: "1.5" }}>
+              Are you sure you want to delete this post? This action is permanent and cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button
+                onClick={() => setPostToDelete(null)}
+                style={{
+                  padding: "8px 16px", border: "1px solid var(--color-outline)", borderRadius: "8px",
+                  background: "transparent", color: "var(--color-on-surface)", cursor: "pointer", fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePost}
+                style={{
+                  padding: "8px 16px", border: "none", borderRadius: "8px",
+                  background: "var(--color-error)", color: "var(--color-on-error)", cursor: "pointer", fontWeight: 600
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

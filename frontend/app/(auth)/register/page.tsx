@@ -162,14 +162,10 @@ export default function RegisterPage() {
         return;
       }
 
-      // Store credentials
-      localStorage.setItem("authToken", data.data.token);
-      localStorage.setItem("user", JSON.stringify(data.data.user));
-
       setSubmitted(true);
-      // Brief timeout before redirecting to dashboard
+      // Brief timeout before redirecting to verification page
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(`/verify-otp?email=${encodeURIComponent(result.data.email)}`);
       }, 1500);
     } catch (error: any) {
       setServerError(error.message || "An error occurred. Please try again.");
@@ -198,7 +194,7 @@ export default function RegisterPage() {
             Welcome to Trailidea, {formData.firstName}. Your adventure starts now.
           </p>
           <div style={{ color: "var(--color-outline)", fontSize: "14px" }}>
-            Redirecting to dashboard...
+            Redirecting to verification...
           </div>
         </div>
       </div>

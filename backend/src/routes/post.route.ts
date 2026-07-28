@@ -16,6 +16,14 @@ postRouter.post(
     postController.createPost
 );
 
+// PUT /api/v1/posts/:id — Edit/update a post
+postRouter.put(
+    "/:id",
+    authorizedMiddleware,
+    upload.array("images", 5),
+    postController.editPost
+);
+
 // GET /api/v1/posts?page=1&limit=10 — Fetch paginated feed
 postRouter.get(
     "/",
@@ -30,6 +38,13 @@ postRouter.post(
     postController.vote
 );
 
+// POST /api/v1/posts/:id/save — Toggle save/unsave a post
+postRouter.post(
+    "/:id/save",
+    authorizedMiddleware,
+    postController.toggleSavePost
+);
+
 // GET /api/v1/posts/:id/comments — Fetch comments
 postRouter.get(
     "/:id/comments",
@@ -42,6 +57,20 @@ postRouter.post(
     "/:id/comments",
     authorizedMiddleware,
     postController.addComment
+);
+
+// DELETE /api/v1/posts/:id/comments/:commentId — Delete a comment
+postRouter.delete(
+    "/:id/comments/:commentId",
+    authorizedMiddleware,
+    postController.deleteComment
+);
+
+// DELETE /api/v1/posts/:id — Delete a post
+postRouter.delete(
+    "/:id",
+    authorizedMiddleware,
+    postController.deletePost
 );
 
 export default postRouter;

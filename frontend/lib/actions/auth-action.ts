@@ -1,5 +1,5 @@
 "use server"; // server side api call
-import { register, login, requestPasswordReset, resetPassword } from "@/lib/api/auth";
+import { register, login, requestPasswordReset, resetPassword, verifyOTP, resendOTP } from "@/lib/api/auth";
 import { LoginFormData, RegisterFormData } from "@/app/(auth)/_components/schema";
 import { setTokenCookie, storeUserData } from "@/lib/cookies";
 
@@ -59,5 +59,35 @@ export const handleResetPassword = async (token: string, newPassword: string) =>
         }
     }catch (error: Error | any){
         return { success: false, message: error?.message || 'Reset password failed' };
+    }
+}
+
+export const handleVerifyOTP = async (email: string, otpCode: string) => {
+    try{
+        const result = await verifyOTP(email, otpCode);
+        if(result.success){
+            if (result.data?.token && result.data?.user) {
+                await setTokenCookie(result.data.token);
+                await storeUserData(result.data.user);
+            }
+            return { success: true, message: result.message, data: result.data };
+        }else{
+            return { success: false, message: result.message || 'Verification failed' };    
+        }
+    }catch (error: Error | any){
+        return { success: false, message: error?.message || 'Verification failed' };
+    }
+}
+
+export const handleResendOTP = async (email: string) => {
+    try{
+        const result = await resendOTP(email);
+        if(result.success){
+            return { success: true, message: result.message };
+        }else{
+            return { success: false, message: result.message || 'Resend failed' };    
+        }
+    }catch (error: Error | any){
+        return { success: false, message: error?.message || 'Resend failed' };
     }
 }

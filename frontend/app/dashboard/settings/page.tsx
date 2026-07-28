@@ -4,6 +4,25 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import Link from "next/link";
 
+const TERRAIN_OPTIONS = [
+  "High Alpine",
+  "Forest",
+  "Ridge Walk",
+  "Glacier",
+  "Desert",
+  "Coastal",
+  "Jungle",
+  "Snow",
+];
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+const resolveImage = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return `${BACKEND_URL}${url}`;
+};
+
 export default function SettingsPage() {
   const { user, updateUserProfile } = useAuth();
 
@@ -12,6 +31,8 @@ export default function SettingsPage() {
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
+  const [selectedTerrains, setSelectedTerrains] = useState<string[]>([]);
 
   // Password form
   const [password, setPassword] = useState("");
@@ -32,6 +53,10 @@ export default function SettingsPage() {
   const [imgSuccess, setImgSuccess] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverSuccess, setCoverSuccess] = useState("");
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
   // Prefill form with user data
   useEffect(() => {
     if (user) {
@@ -39,12 +64,19 @@ export default function SettingsPage() {
       setLastName(user.lastName || "");
       setUsername(user.username || "");
       setEmail(user.email || "");
+      setBio(user.bio || "");
+      setSelectedTerrains(user.preferredTerrains || []);
     }
   }, [user]);
 
   const getAvatarUrl = () => {
-    if (user?.imageUrl) return user.imageUrl;
+    if (user?.imageUrl) return resolveImage(user.imageUrl);
     return `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.username || "explorer"}`;
+  };
+
+  const getCoverUrl = () => {
+    if (user?.coverImageUrl) return resolveImage(user.coverImageUrl);
+    return "";
   };
 
   // Handle profile image upload
@@ -68,6 +100,38 @@ export default function SettingsPage() {
     }
   };
 
+  // Handle cover image upload
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+
+    setCoverLoading(true);
+    setCoverSuccess("");
+    try {
+      const formData = new FormData();
+      formData.append("cover_pic", file);
+      await updateUserProfile(formData);
+      setCoverSuccess("Cover image updated!");
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setCoverLoading(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  };
+
+  // Handle terrain toggle
+  const handleTerrainToggle = (terrain: string) => {
+    setSelectedTerrains((prev) => {
+      if (prev.includes(terrain)) {
+        return prev.filter((t) => t !== terrain);
+      }
+      if (prev.length >= 4) return prev; // Max 4
+      return [...prev, terrain];
+    });
+  };
+
   // Handle profile details update
   const handleProfileSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -81,7 +145,15 @@ export default function SettingsPage() {
 
     setProfileLoading(true);
     try {
-      await updateUserProfile({ firstName, lastName, username, email });
+      const formData = new FormData();
+      formData.append("firstName", firstName);
+      formData.append("lastName", lastName);
+      formData.append("username", username);
+      formData.append("email", email);
+      formData.append("bio", bio);
+      formData.append("preferredTerrains", JSON.stringify(selectedTerrains));
+
+      await updateUserProfile(formData);
       setProfileSuccess("Profile updated successfully!");
     } catch (err: any) {
       setProfileError(err.message || "Failed to update profile");
@@ -122,6 +194,8 @@ export default function SettingsPage() {
     }
   };
 
+  const coverUrl = getCoverUrl();
+
   return (
     <div className="settings-page">
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
@@ -146,7 +220,46 @@ export default function SettingsPage() {
         </Link>
         <h2>Settings</h2>
       </div>
-      <p>Manage your profile details, avatar, and account security.</p>
+      <p>Manage your profile details, avatar, banner, and account security.</p>
+
+      {/* ═══ Cover Image Section ═══ */}
+      <div className="settings-section">
+        <h3>Cover Image</h3>
+        <p>Upload a banner for your profile (recommended 1584×396, 4:1 ratio).</p>
+
+        <div className="settings-cover-preview">
+          {coverUrl ? (
+            <img src={coverUrl} alt="Cover" className="settings-cover-img" />
+          ) : (
+            <div className="settings-cover-placeholder">
+              <span className="material-symbols-outlined" style={{ fontSize: 40, color: "var(--color-outline)" }}>panorama</span>
+              <p style={{ fontSize: 13, color: "var(--color-outline)", marginTop: 8 }}>No cover image uploaded</p>
+            </div>
+          )}
+        </div>
+
+        <div className="settings-avatar-actions" style={{ marginTop: 12 }}>
+          <label>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span>
+            {coverLoading ? "Uploading..." : "Upload Cover"}
+            <input
+              type="file"
+              ref={coverInputRef}
+              onChange={handleCoverUpload}
+              accept="image/*"
+              style={{ display: "none" }}
+            />
+          </label>
+          <span>JPG, PNG, WEBP — Recommended 1584×396</span>
+        </div>
+
+        {coverSuccess && (
+          <div role="alert" style={{ background: "var(--color-success-container)", color: "var(--color-on-success-container)", borderRadius: "var(--radius-default)", padding: "8px 12px", fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
+            {coverSuccess}
+          </div>
+        )}
+      </div>
 
       {/* ═══ Profile Picture Section ═══ */}
       <div className="settings-section">
@@ -174,20 +287,7 @@ export default function SettingsPage() {
         </div>
 
         {imgSuccess && (
-          <div
-            role="alert"
-            style={{
-              background: "var(--color-success-container)",
-              color: "var(--color-on-success-container)",
-              borderRadius: "var(--radius-default)",
-              padding: "8px 12px",
-              fontSize: 14,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
+          <div role="alert" style={{ background: "var(--color-success-container)", color: "var(--color-on-success-container)", borderRadius: "var(--radius-default)", padding: "8px 12px", fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
             {imgSuccess}
           </div>
@@ -200,41 +300,13 @@ export default function SettingsPage() {
         <p>Update your personal information.</p>
 
         {profileSuccess && (
-          <div
-            role="alert"
-            style={{
-              background: "var(--color-success-container)",
-              color: "var(--color-on-success-container)",
-              borderRadius: "var(--radius-default)",
-              padding: "10px 14px",
-              fontSize: 14,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
+          <div role="alert" style={{ background: "var(--color-success-container)", color: "var(--color-on-success-container)", borderRadius: "var(--radius-default)", padding: "10px 14px", fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
             {profileSuccess}
           </div>
         )}
         {profileError && (
-          <div
-            role="alert"
-            style={{
-              background: "var(--color-error-container)",
-              color: "var(--color-on-error-container)",
-              borderRadius: "var(--radius-default)",
-              padding: "10px 14px",
-              fontSize: 14,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
+          <div role="alert" style={{ background: "var(--color-error-container)", color: "var(--color-on-error-container)", borderRadius: "var(--radius-default)", padding: "10px 14px", fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
             {profileError}
           </div>
@@ -315,6 +387,64 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Bio */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-bio">
+              Bio
+            </label>
+            <div className="form-input-wrapper" style={{ flexDirection: "column", alignItems: "stretch" }}>
+              <textarea
+                id="settings-bio"
+                className="form-input"
+                value={bio}
+                onChange={(e) => {
+                  if (e.target.value.length <= 160) setBio(e.target.value);
+                }}
+                placeholder="Tell us about yourself..."
+                rows={3}
+                style={{ resize: "vertical", minHeight: 80 }}
+              />
+              <span className="settings-bio-counter" style={{
+                textAlign: "right",
+                fontSize: 12,
+                color: bio.length >= 150 ? "var(--color-error)" : "var(--color-outline)",
+                marginTop: 4,
+              }}>
+                {bio.length}/160
+              </span>
+            </div>
+          </div>
+
+          {/* Terrain Selector */}
+          <div className="form-group">
+            <label className="form-label">
+              Preferred Terrain
+              <span style={{ fontSize: 12, color: "var(--color-outline)", marginLeft: 8, fontWeight: 400 }}>
+                ({selectedTerrains.length}/4 selected)
+              </span>
+            </label>
+            <div className="terrain-selector">
+              {TERRAIN_OPTIONS.map((terrain) => {
+                const isSelected = selectedTerrains.includes(terrain);
+                const isDisabled = !isSelected && selectedTerrains.length >= 4;
+                return (
+                  <button
+                    key={terrain}
+                    type="button"
+                    className={`terrain-selector__chip ${isSelected ? "terrain-selector__chip--active" : ""} ${isDisabled ? "terrain-selector__chip--disabled" : ""}`}
+                    onClick={() => handleTerrainToggle(terrain)}
+                    disabled={isDisabled}
+                  >
+                    {isSelected && (
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, marginRight: "4px" }}>check</span>
+                    )}
+                    <span>{terrain}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button
             type="submit"
             className="btn btn--primary"
@@ -347,41 +477,13 @@ export default function SettingsPage() {
         <p>Update your account password to keep your profile secure.</p>
 
         {pwdSuccess && (
-          <div
-            role="alert"
-            style={{
-              background: "var(--color-success-container)",
-              color: "var(--color-on-success-container)",
-              borderRadius: "var(--radius-default)",
-              padding: "10px 14px",
-              fontSize: 14,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
+          <div role="alert" style={{ background: "var(--color-success-container)", color: "var(--color-on-success-container)", borderRadius: "var(--radius-default)", padding: "10px 14px", fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
             {pwdSuccess}
           </div>
         )}
         {pwdError && (
-          <div
-            role="alert"
-            style={{
-              background: "var(--color-error-container)",
-              color: "var(--color-on-error-container)",
-              borderRadius: "var(--radius-default)",
-              padding: "10px 14px",
-              fontSize: 14,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
+          <div role="alert" style={{ background: "var(--color-error-container)", color: "var(--color-on-error-container)", borderRadius: "var(--radius-default)", padding: "10px 14px", fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
             {pwdError}
           </div>

@@ -5,7 +5,7 @@ import { HttpException } from "../exceptions/http-exception";
 import bycryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { CLIENT_URL, SECRET_KEY } from "../configs/constant";
-import { sendEmail } from "../configs/email";
+import { sendEmail, sendOTPEmail, sendPasswordResetEmail, sendPasswordResetOTPEmail } from "../configs/email";
 
 const userRepository = new UserMongoRepository();
 
@@ -23,7 +23,23 @@ export class UserService {
         // hash password
         const hashedPassword = await bycryptjs.hash(userData.password, 10);
         userData.password = hashedPassword;
-        const user = await userRepository.createUser(userData);
+
+        // OTP Generation
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit
+        const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+
+        const userToCreate = {
+            ...userData,
+            isVerified: false,
+            otpCode,
+            otpExpiresAt,
+        };
+
+        const user = await userRepository.createUser(userToCreate);
+
+        // Send OTP asynchronously
+        sendOTPEmail(user.email, otpCode).catch(console.error);
+
         return user;
     }
 
@@ -31,6 +47,18 @@ export class UserService {
         const user = await userRepository.getUserByEmail(loginData.email);
         if (!user) {
             throw new HttpException(400, "Invalid email");
+        }
+        if (!user.isVerified) {
+            // Automatically resend OTP
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 mins
+            await userRepository.update(user._id.toString(), {
+                otpCode,
+                otpExpiresAt,
+            });
+            sendOTPEmail(user.email, otpCode).catch(console.error);
+
+            throw new HttpException(403, "Please verify your email address to log in");
         }
         const isPasswordValid = await bycryptjs.compare(
             loginData.password,  // client password
@@ -80,12 +108,56 @@ export class UserService {
         if (!user) {
             throw new HttpException(404, "User not found");
         }
-        const token = jwt.sign({ id: user._id }, SECRET_KEY, { expiresIn: '1h' }); // 1 hour expiry
-        const resetLink = `${CLIENT_URL}/reset-password?token=${token}`;
-        const html = `<p>Click <a href="${resetLink}">here</a> to reset your password. This link will expire in 1 hour.</p>`;
-        await sendEmail(user.email, "Password Reset", html);
+        const token = jwt.sign({ id: user._id }, SECRET_KEY, { expiresIn: '15m' }); // 15 min expiry
+        const resetLink = `${CLIENT_URL}/reset-password/${token}`;
+        
+        await sendPasswordResetEmail(user.email, resetLink);
         return { user, token };
 
+    }
+
+    async sendResetPasswordOTP(email?: string) {
+        if (!email) {
+            throw new HttpException(400, "Email is required");
+        }
+        const user = await userRepository.getUserByEmail(email);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+        
+        await userRepository.update(user._id.toString(), {
+            otpCode,
+            otpExpiresAt,
+        });
+
+        await sendPasswordResetOTPEmail(user.email, otpCode);
+        return { message: "Reset password OTP sent successfully" };
+    }
+
+    async resetPasswordWithOTP(email?: string, otpCode?: string, newPassword?: string) {
+        if (!email || !otpCode || !newPassword) {
+            throw new HttpException(400, "Email, OTP and new password are required");
+        }
+        const user = await userRepository.getUserByEmail(email);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        if (user.otpCode !== otpCode) {
+            throw new HttpException(400, "Invalid OTP code");
+        }
+        if (user.otpExpiresAt && new Date() > user.otpExpiresAt) {
+            throw new HttpException(400, "OTP code has expired");
+        }
+        const hashedPassword = await bycryptjs.hash(newPassword, 10);
+        await userRepository.update(user._id.toString(), { 
+            password: hashedPassword,
+            otpCode: undefined,
+            otpExpiresAt: undefined,
+        });
+        return user;
     }
 
     async resetPassword(token?: string, newPassword?: string) {
@@ -105,6 +177,59 @@ export class UserService {
         } catch (error) {
             throw new HttpException(400, "Invalid or expired token");
         }
+    }
+
+    async verifyOTP(email: string, otpCode: string) {
+        const user = await userRepository.getUserByEmail(email);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        if (user.isVerified) {
+            throw new HttpException(400, "User is already verified");
+        }
+        if (user.otpCode !== otpCode) {
+            throw new HttpException(400, "Invalid OTP code");
+        }
+        if (!user.otpExpiresAt || new Date() > user.otpExpiresAt) {
+            throw new HttpException(400, "OTP code has expired");
+        }
+
+        // Mark as verified and clear OTP fields
+        const updatedUser = await userRepository.update(user._id.toString(), {
+            isVerified: true,
+            $unset: { otpCode: 1, otpExpiresAt: 1 }
+        } as any);
+
+        const token = jwt.sign(
+            { id: updatedUser._id, email: updatedUser.email, role: updatedUser.role },
+            SECRET_KEY,
+            { expiresIn: "30d" }
+        );
+
+        return { user: updatedUser, token };
+    }
+
+    async resendOTP(email: string) {
+        const user = await userRepository.getUserByEmail(email);
+        if (!user) {
+            throw new HttpException(404, "User not found");
+        }
+        if (user.isVerified) {
+            throw new HttpException(400, "User is already verified");
+        }
+
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 mins
+
+        await userRepository.update(user._id.toString(), {
+            otpCode,
+            otpExpiresAt,
+        });
+
+        // Send asynchronously
+        sendOTPEmail(user.email, otpCode).catch(console.error);
+
+        return { message: "OTP resent successfully" };
     }
 }
 

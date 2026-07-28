@@ -50,7 +50,8 @@ export const requestPasswordReset = async (email: string) => {
         const response = await axiosInstance.post("/api/v1/auth/request-password-reset", { email });
         return response.data;
     } catch (error: Error | any) {
-        throw new Error(error?.response?.data?.message || 'Request password reset failed');
+        console.error("requestPasswordReset error:", error?.response?.data || error.message);
+        throw new Error(error?.response?.data?.message || error.message || 'Request password reset failed');
     }
 }
 
@@ -59,6 +60,27 @@ export const resetPassword = async (token: string, newPassword: string) => {
         const response = await axiosInstance.post(`/api/v1/auth/reset-password/${token}`, { newPassword });
         return response.data;
     } catch (error: Error | any) {
-        throw new Error(error?.response?.data?.message || 'Reset password failed');
+        console.error("resetPassword error:", error?.response?.data || error.message);
+        throw new Error(error?.response?.data?.message || error.message || 'Reset password failed');
+    }
+}
+
+export const verifyOTP = async (email: string, otpCode: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/v1/auth/verify-otp`, { email, otpCode });
+        return response.data;
+    } catch (error: Error | any) {
+        console.error("verifyOTP error:", error?.response?.data || error.message);
+        throw new Error(error?.response?.data?.message || error.message || 'Verification failed');
+    }
+}
+
+export const resendOTP = async (email: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/v1/auth/resend-otp`, { email });
+        return response.data;
+    } catch (error: Error | any) {
+        console.error("resendOTP error:", error?.response?.data || error.message);
+        throw new Error(error?.response?.data?.message || error.message || 'Failed to resend OTP');
     }
 }
