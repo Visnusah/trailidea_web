@@ -65,7 +65,7 @@ export class PostController {
             // Extract uploaded file paths
             const files = req.files as Express.Multer.File[] | undefined;
             const imageUrls = files
-                ? files.map((file) => "/uploads/" + file.filename)
+                ? files.map((file) => file.filename.startsWith("http") ? file.filename : "/uploads/" + file.filename)
                 : [];
 
             const post = await postService.createPost(userId, parsed.data, imageUrls);
@@ -357,7 +357,7 @@ export class PostController {
             
             // Extract uploaded files
             const files = req.files as Express.Multer.File[] | undefined;
-            const newUploads = files ? files.map((file) => "/uploads/" + file.filename) : [];
+            const newUploads = files ? files.map((file) => file.filename.startsWith("http") ? file.filename : "/uploads/" + file.filename) : [];
 
             if (parsed.data.imageOrder) {
                 try {

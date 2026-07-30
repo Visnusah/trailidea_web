@@ -87,12 +87,16 @@ export class UserController {
             // Set profile pic URL
             const profilePicFilename = profilePicFile?.filename || singleFile?.filename;
             if (profilePicFilename) {
-                updateData.imageUrl = "/uploads/" + profilePicFilename;
+                updateData.imageUrl = profilePicFilename.startsWith("http") 
+                    ? profilePicFilename 
+                    : "/uploads/" + profilePicFilename;
             }
 
             // Set cover pic URL
             if (coverPicFile?.filename) {
-                updateData.coverImageUrl = "/uploads/" + coverPicFile.filename;
+                updateData.coverImageUrl = coverPicFile.filename.startsWith("http")
+                    ? coverPicFile.filename
+                    : "/uploads/" + coverPicFile.filename;
             }
 
             const updatedUser = await userService.updateUser(userId, updateData);
