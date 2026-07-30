@@ -6,12 +6,18 @@ const resend = new Resend(RESEND_API_KEY);
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
     try {
-        const data = await resend.emails.send({
-            from: 'Trailidea <onboarding@resend.dev>', // You must verify a domain on Resend to use your own email
+        const { data, error } = await resend.emails.send({
+            from: 'onboarding@resend.dev', // You must verify a domain on Resend to use your own email
             to,
             subject,
             html,
         });
+        
+        if (error) {
+            console.error('Resend API Error:', error);
+            throw new Error(error.message);
+        }
+        
         console.log('Email sent successfully:', data);
     } catch (error) {
         console.error('Error sending email via Resend:', error);

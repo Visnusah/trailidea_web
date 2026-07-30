@@ -13,3 +13,10 @@ export const RESEND_API_KEY: string =
     process.env.RESEND_API_KEY || "";
 export const CLIENT_URL: string =
     process.env.CLIENT_URL || 'http://localhost:3000';
+
+// Cloudflare R2 Settings
+export const R2_ACCOUNT_ID: string = process.env.R2_ACCOUNT_ID || "3fb5e37d7cb26b1858f545356dfe75cd";
+export const R2_ACCESS_KEY_ID: string = process.env.R2_ACCESS_KEY_ID || "";
+export const R2_SECRET_ACCESS_KEY: string = process.env.R2_SECRET_ACCESS_KEY || "";
+export const R2_BUCKET_NAME: string = process.env.R2_BUCKET_NAME || "";
+export const R2_PUBLIC_URL: string = process.env.R2_PUBLIC_URL || "";
