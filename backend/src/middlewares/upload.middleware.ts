@@ -59,6 +59,17 @@ const upload = multer({
 });
 
 import sharp from "sharp";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL } from "../configs/constant";
+
+const s3Client = new S3Client({
+    region: "auto",
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY,
+    }
+});
 
 const processImages = async (req: Request, res: any, next: any) => {
     if (!req.file && !req.files) return next();
@@ -71,14 +82,11 @@ const processImages = async (req: Request, res: any, next: any) => {
                        
         if (isHeic) {
             const tempPath = file.path;
-            // Ensure the new filename ends with .jpg
             const newFilename = file.filename.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg");
             const newPath = path.join(path.dirname(tempPath), newFilename + (newFilename.endsWith(".jpg") ? "" : ".jpg"));
             
-            // sharp will read the HEIC file and write out JPEG
             await sharp(tempPath).jpeg().toFile(newPath);
             
-            // Delete original HEIC file
             if (fs.existsSync(tempPath)) {
                 fs.unlinkSync(tempPath);
             }
@@ -86,6 +94,29 @@ const processImages = async (req: Request, res: any, next: any) => {
             file.path = newPath;
             file.filename = path.basename(newPath);
             file.mimetype = "image/jpeg";
+        }
+
+        // Upload to Cloudflare R2
+        if (R2_ACCESS_KEY_ID && R2_BUCKET_NAME) {
+            const fileContent = fs.readFileSync(file.path);
+            const r2Key = `uploads/${Date.now()}-${file.filename}`;
+            
+            await s3Client.send(new PutObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: r2Key,
+                Body: fileContent,
+                ContentType: file.mimetype,
+            }));
+            
+            // Delete local temp file
+            if (fs.existsSync(file.path)) {
+                fs.unlinkSync(file.path);
+            }
+            
+            // Overwrite file properties to use the public R2 URL
+            const publicUrl = `${R2_PUBLIC_URL}/${r2Key}`;
+            file.path = publicUrl;
+            file.filename = publicUrl; // Assuming DB stores this
         }
     };
 
